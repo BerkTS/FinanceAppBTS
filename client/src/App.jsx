@@ -57,13 +57,13 @@ function formatCandleCell(iso, range) {
 
 function PriceRangePicker({ value, onChange }) {
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Price history range">
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Price history range">
       {PRICE_RANGES.map((r) => (
         <button
           key={r}
           type="button"
           onClick={() => onChange(r)}
-          className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition ${
+          className={`rounded-md px-2.5 py-1 text-lg font-medium transition ${
             value === r
               ? "bg-emerald-500/25 text-emerald-100 border border-emerald-500/40"
               : "border border-surface-border text-muted hover:text-slate-200"
@@ -110,7 +110,7 @@ function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact =
     return b >= a ? "#34d399" : "#fb7185";
   }, [prepared]);
 
-  const textSize = compact ? "text-[10px]" : "text-xs";
+  const textSize = compact ? "text-lg" : "text-xl";
   if (needsSchwab) {
     return <p className={`text-muted ${textSize}`}>Connect Schwab for price history.</p>;
   }
@@ -135,7 +135,7 @@ function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact =
       style={{ height: chartH }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={prepared} margin={{ top: 6, right: 6, left: 0, bottom: 2 }}>
+        <AreaChart data={prepared} margin={{ top: 8, right: 8, left: 4, bottom: 4 }}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={stroke} stopOpacity={0.45} />
@@ -149,7 +149,7 @@ function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact =
             domain={[tMin, tMax]}
             scale="time"
             tickFormatter={(t) => tickTimeLabel(t, range)}
-            tick={{ fill: "#64748b", fontSize: compact ? 9 : 10 }}
+            tick={{ fill: "#64748b", fontSize: compact ? 11 : 12 }}
             axisLine={{ stroke: "#334155" }}
             tickLine={false}
             minTickGap={compact ? 24 : 36}
@@ -157,8 +157,8 @@ function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact =
           <YAxis
             orientation="right"
             domain={["auto", "auto"]}
-            width={compact ? 36 : 44}
-            tick={{ fill: "#64748b", fontSize: compact ? 9 : 10 }}
+            width={compact ? 40 : 48}
+            tick={{ fill: "#64748b", fontSize: compact ? 11 : 12 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => (Number.isFinite(v) ? Number(v).toFixed(0) : "")}
@@ -169,7 +169,7 @@ function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact =
               background: "#121722",
               border: "1px solid #1e2636",
               borderRadius: 8,
-              fontSize: 11,
+              fontSize: 15,
             }}
             labelFormatter={(t) => formatCandleCell(new Date(Number(t)).toISOString(), range)}
             formatter={(v) => [`$${fmtPrice(v)}`, "Close"]}
@@ -190,7 +190,7 @@ function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact =
 }
 
 function PriceHistoryTable({ rows, loading, error, needsSchwab, range, compact = false }) {
-  const textSize = compact ? "text-[10px]" : "text-xs";
+  const textSize = compact ? "text-lg" : "text-xl";
   if (needsSchwab) {
     return (
       <p className={`text-muted ${textSize}`}>Connect Schwab for OHLC history.</p>
@@ -211,31 +211,31 @@ function PriceHistoryTable({ rows, loading, error, needsSchwab, range, compact =
   return (
     <div
       className={`overflow-x-auto rounded-lg border border-surface-border bg-black/15 ${
-        compact ? "max-h-36 overflow-y-auto" : "max-h-56 overflow-y-auto"
+        compact ? "max-h-52 overflow-y-auto" : "max-h-72 overflow-y-auto"
       }`}
     >
       <table className={`w-full text-left font-mono text-slate-300 ${textSize}`}>
-        <thead className="sticky top-0 bg-surface/95 text-[10px] uppercase text-muted">
+        <thead className="sticky top-0 bg-surface/95 text-xl uppercase tracking-wide text-muted">
           <tr>
-            <th className="px-2 py-1.5 font-medium">Date</th>
-            <th className="px-2 py-1.5 font-medium">O</th>
-            <th className="px-2 py-1.5 font-medium">H</th>
-            <th className="px-2 py-1.5 font-medium">L</th>
-            <th className="px-2 py-1.5 font-medium">C</th>
-            <th className="px-2 py-1.5 font-medium">Vol</th>
+            <th className="px-3 py-2.5 font-medium">Date</th>
+            <th className="px-3 py-2.5 font-medium">O</th>
+            <th className="px-3 py-2.5 font-medium">H</th>
+            <th className="px-3 py-2.5 font-medium">L</th>
+            <th className="px-3 py-2.5 font-medium">C</th>
+            <th className="px-3 py-2.5 font-medium">Vol</th>
           </tr>
         </thead>
         <tbody>
           {ordered.map((row) => (
             <tr key={`${row.time}-${row.date}`} className="border-t border-surface-border/60">
-              <td className="whitespace-nowrap px-2 py-1 text-slate-400">
+              <td className="whitespace-nowrap px-3 py-2 text-slate-400">
                 {formatCandleCell(row.date, range)}
               </td>
-              <td className="px-2 py-1">{fmtPrice(row.open)}</td>
-              <td className="px-2 py-1">{fmtPrice(row.high)}</td>
-              <td className="px-2 py-1">{fmtPrice(row.low)}</td>
-              <td className="px-2 py-1 text-slate-100">{fmtPrice(row.close)}</td>
-              <td className="px-2 py-1 text-slate-500">{fmtVol(row.volume)}</td>
+              <td className="px-3 py-2">{fmtPrice(row.open)}</td>
+              <td className="px-3 py-2">{fmtPrice(row.high)}</td>
+              <td className="px-3 py-2">{fmtPrice(row.low)}</td>
+              <td className="px-3 py-2 text-slate-100">{fmtPrice(row.close)}</td>
+              <td className="px-3 py-2 text-slate-500">{fmtVol(row.volume)}</td>
             </tr>
           ))}
         </tbody>
@@ -253,7 +253,7 @@ function Badge({ children, tone = "neutral" }) {
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${tones[tone]}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xl font-medium ${tones[tone]}`}
     >
       {children}
     </span>
@@ -275,7 +275,7 @@ function SectionHeading({ children, variant }) {
   };
   return (
     <h2
-      className={`mb-4 border-b-2 pb-2 text-xl font-bold tracking-tight ${styles[variant]}`}
+      className={`mb-6 border-b-2 pb-4 text-5xl font-bold tracking-tight ${styles[variant]}`}
     >
       {children}
     </h2>
@@ -736,28 +736,36 @@ export default function App() {
   return (
     <div className="min-h-screen font-sans">
       <header className="border-b border-surface-border bg-surface-card/60 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4 px-6 py-5">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-muted">
+            <p className="text-xl font-medium uppercase tracking-wide text-muted">
               Portfolio intelligence
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Finance signal board
-            </h1>
+            <div className="mt-2 min-w-0">
+              <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
+                <span className="bg-gradient-to-r from-emerald-200 via-slate-50 to-violet-300 bg-clip-text text-transparent">
+                  Finance App BTS
+                </span>
+              </h1>
+              <div
+                className="mt-4 h-1 max-w-[11.5rem] rounded-full bg-gradient-to-r from-emerald-500 via-sky-400 to-violet-500 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
+                aria-hidden
+              />
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="info">GDELT + NewsAPI + Alpha Vantage</Badge>
             <button
               type="button"
               onClick={loadDiscover}
-              className="rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
+              className="rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-xl font-medium text-slate-200 transition hover:border-accent/50 hover:text-white"
             >
               Refresh
             </button>
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
-              className="rounded-lg border border-slate-500/50 bg-slate-800/80 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-400 hover:text-white"
+              className="rounded-lg border border-slate-500/50 bg-slate-800/80 px-3 py-2 text-xl font-medium text-slate-200 transition hover:border-slate-400 hover:text-white"
             >
               History
             </button>
@@ -765,7 +773,7 @@ export default function App() {
               type="button"
               onClick={openSchwabLogin}
               disabled={schwabConnected}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold shadow-lg transition ${
+              className={`rounded-lg px-3 py-2 text-xl font-semibold shadow-lg transition ${
                 schwabConnected
                   ? "border border-emerald-500/50 bg-emerald-900/40 text-emerald-300 shadow-emerald-900/20 cursor-default"
                   : "bg-accent text-white shadow-blue-900/30 hover:bg-accent-dim"
@@ -779,21 +787,21 @@ export default function App() {
 
       <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} />
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-3">
-        <section className="lg:col-span-2 space-y-10">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-border bg-surface-card/50 px-4 py-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+      <main className="mx-auto grid max-w-[1440px] gap-8 px-6 py-10 lg:grid-cols-3">
+        <section className="lg:col-span-2 space-y-12">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-border bg-surface-card/50 px-5 py-4 shadow-sm ring-1 ring-white/[0.04]">
+            <h2 className="text-xl font-semibold uppercase tracking-wide text-slate-400">
               Data feeds
             </h2>
-            {loading && <span className="text-sm text-muted">Loading…</span>}
+            {loading && <span className="text-xl text-muted">Loading…</span>}
           </div>
           {err && (
-            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xl text-rose-100">
               {err}
             </div>
           )}
           {discover?.news && (
-            <div className="flex flex-wrap gap-2 text-xs text-muted">
+            <div className="flex flex-wrap gap-2 text-xl text-muted leading-relaxed">
               <span>
                 Feeds: GDELT {discover.news.sources?.fallback ? "(+ mock fallback)" : "live"}
                 {discover.news.sources?.newsapi ? " · NewsAPI" : ""}
@@ -808,34 +816,34 @@ export default function App() {
             </div>
           )}
 
-          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-950/15 p-6 shadow-xl shadow-black/25">
+          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-950/15 p-7 shadow-xl shadow-black/25 ring-1 ring-white/[0.07]">
             <SectionHeading variant="tradeView">Structured AI trade view</SectionHeading>
-            <p className="-mt-2 mb-4 text-xs text-muted">
+            <p className="-mt-1 mb-5 text-xl leading-relaxed text-muted">
               Discovery top 5 · Schwab + rules + bias · Claude & ChatGPT — same ranked universe as
               live suggestions; models echo rule-based entry/stop/targets and add bias + context.{" "}
               {tradeAiBulkLoading && <span className="text-slate-400">Loading…</span>}
             </p>
-            <div className="rounded-2xl border border-emerald-500/20 bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+            <div className="rounded-2xl border border-emerald-500/25 bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             {tradeAiBulk?.disclaimer && (
-              <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-amber-100/90">
+              <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xl leading-relaxed text-amber-100/90">
                 {tradeAiBulk.disclaimer}
               </p>
             )}
             {tradeAiBulkErr && (
-              <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+              <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-xl text-rose-100">
                 {tradeAiBulkErr}
               </p>
             )}
             {tradeAiBulk?.needsSchwab && !tradeAiBulkLoading && (
-              <p className="mt-3 text-sm text-muted">Connect Schwab for structured levels.</p>
+              <p className="mt-3 text-xl text-muted">Connect Schwab for structured levels.</p>
             )}
             {tradeAiBulk?.cacheHit && (
-              <p className="mt-1 text-xs text-slate-500">Cached snapshot (short TTL).</p>
+              <p className="mt-1 text-xl text-slate-500">Cached snapshot (short TTL).</p>
             )}
             {Array.isArray(tradeAiBulk?.views) && tradeAiBulk.views.length > 0 && (
-              <div className="mt-4 space-y-6">
-                <div className="flex flex-wrap items-center gap-3 border-b border-emerald-500/20 pb-3">
-                  <span className="text-xs text-muted">OHLC range (all rows):</span>
+              <div className="mt-5 space-y-8">
+                <div className="flex flex-wrap items-center gap-3 border-b border-emerald-500/25 pb-4">
+                  <span className="text-xl font-medium text-slate-300">OHLC range (all rows):</span>
                   <PriceRangePicker value={bulkPriceRange} onChange={setBulkPriceRange} />
                 </div>
                 {tradeAiBulk.views.map((row) => {
@@ -844,22 +852,22 @@ export default function App() {
                   return (
                   <div
                     key={row.symbol}
-                    className="rounded-xl border border-surface-border bg-surface/35 px-4 py-4"
+                    className="rounded-xl border border-surface-border bg-slate-950/50 px-5 py-5 shadow-md ring-1 ring-white/[0.06]"
                   >
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <button
                         type="button"
                         onClick={() => setSelected(row.symbol)}
-                        className="font-mono text-lg font-semibold text-emerald-200 hover:underline"
+                        className="font-mono text-xl font-semibold text-emerald-200 hover:underline"
                       >
                         {row.symbol}
                       </button>
-                      <span className="font-mono text-base text-slate-100">
+                      <span className="font-mono text-xl text-slate-100">
                         ${fmtPrice(row.quote?.last)}
                       </span>
                       {row.quote?.changePct != null && (
                         <span
-                          className={`text-sm ${
+                          className={`text-xl ${
                             row.quote.changePct >= 0 ? "text-emerald-300/90" : "text-rose-300/90"
                           }`}
                         >
@@ -867,10 +875,10 @@ export default function App() {
                           {row.quote.changePct}%)
                         </span>
                       )}
-                      <span className="ml-auto text-xs text-muted">Score {row.score}</span>
+                      <span className="ml-auto text-lg text-muted">Score {row.score}</span>
                     </div>
                     {row.ruleTargets && (
-                      <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                      <dl className="mt-4 grid gap-3 text-xl sm:grid-cols-2">
                         <div className="rounded-lg bg-black/20 px-2 py-2">
                           <dt className="text-muted">Entry zone</dt>
                           <dd className="font-mono text-slate-200">
@@ -886,9 +894,9 @@ export default function App() {
                         </div>
                       </dl>
                     )}
-                    <div className="mt-3 space-y-3">
+                    <div className="mt-4 space-y-4">
                       <div>
-                        <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                        <p className="mb-2 text-xl font-semibold uppercase tracking-wide text-slate-400">
                           Close price ({bulkPriceRange})
                         </p>
                         <PriceHistoryChart
@@ -901,7 +909,7 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                        <p className="mb-2 text-xl font-semibold uppercase tracking-wide text-slate-400">
                           OHLC table
                         </p>
                         <PriceHistoryTable
@@ -915,8 +923,8 @@ export default function App() {
                       </div>
                     </div>
                     {row.claude && (
-                      <div className="mt-3 border-t border-surface-border pt-3 text-sm">
-                        <span className="text-xs font-semibold uppercase text-violet-300/90">Claude</span>
+                      <div className="mt-4 border-t border-surface-border pt-4 text-xl leading-relaxed">
+                        <span className="text-xl font-semibold uppercase tracking-wide text-violet-300/90">Claude</span>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <Badge
                             tone={
@@ -933,18 +941,18 @@ export default function App() {
                             <Badge tone="info">Headlines vs setup</Badge>
                           )}
                         </div>
-                        <p className="mt-2 leading-relaxed text-slate-300">{row.claude.thesis}</p>
+                        <p className="mt-2 text-xl leading-relaxed text-slate-300">{row.claude.thesis}</p>
                         {row.claude.risks && (
-                          <p className="mt-2 text-xs text-rose-200/85">Risks: {row.claude.risks}</p>
+                          <p className="mt-2 text-xl text-rose-200/85">Risks: {row.claude.risks}</p>
                         )}
                       </div>
                     )}
                     {row.claudeError && (
-                      <p className="mt-2 text-xs text-amber-200/85">Claude: {row.claudeError}</p>
+                      <p className="mt-2 text-xl text-amber-200/85">Claude: {row.claudeError}</p>
                     )}
                     {row.openai && (
-                      <div className="mt-3 border-t border-surface-border pt-3 text-sm">
-                        <span className="text-xs font-semibold uppercase text-sky-300/90">ChatGPT</span>
+                      <div className="mt-4 border-t border-surface-border pt-4 text-xl leading-relaxed">
+                        <span className="text-xl font-semibold uppercase tracking-wide text-sky-300/90">ChatGPT</span>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <Badge
                             tone={
@@ -961,14 +969,14 @@ export default function App() {
                             <Badge tone="info">Headlines vs setup</Badge>
                           )}
                         </div>
-                        <p className="mt-2 leading-relaxed text-slate-300">{row.openai.thesis}</p>
+                        <p className="mt-2 text-xl leading-relaxed text-slate-300">{row.openai.thesis}</p>
                         {row.openai.risks && (
-                          <p className="mt-2 text-xs text-rose-200/85">Risks: {row.openai.risks}</p>
+                          <p className="mt-2 text-xl text-rose-200/85">Risks: {row.openai.risks}</p>
                         )}
                       </div>
                     )}
                     {row.openaiError && (
-                      <p className="mt-2 text-xs text-amber-200/85">OpenAI: {row.openaiError}</p>
+                      <p className="mt-2 text-xl text-amber-200/85">OpenAI: {row.openaiError}</p>
                     )}
                   </div>
                   );
@@ -978,62 +986,62 @@ export default function App() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-violet-500/25 bg-violet-950/20 p-6 shadow-xl shadow-black/25">
+          <div className="rounded-2xl border border-violet-500/25 bg-violet-950/20 p-7 shadow-xl shadow-black/25 ring-1 ring-white/[0.07]">
             <SectionHeading variant="claude">Claude</SectionHeading>
-            <div className="space-y-5">
-          <div className="rounded-2xl border border-amber-500/30 bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+            <div className="space-y-6">
+          <div className="rounded-2xl border border-amber-500/30 bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Live trade suggestions
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-xl text-muted">
                 Schwab quotes + rule targets + Claude · orders not sent
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-2 text-xl leading-relaxed text-muted">
               Ranked from discovery + news; entry/stop/targets use ATR-style volatility from recent daily
               bars. {tradeSuggestLoading && <span className="text-slate-400">Loading…</span>}
             </p>
             {tradeSuggest?.disclaimer && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xl leading-relaxed text-amber-100/95">
                 {tradeSuggest.disclaimer}
               </p>
             )}
             {tradeSuggestErr && (
-              <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+              <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-xl text-rose-100">
                 {tradeSuggestErr}
               </p>
             )}
             {tradeSuggest?.needsSchwab && !tradeSuggestLoading && (
-              <p className="mt-3 text-sm text-muted">
+              <p className="mt-3 text-xl text-muted">
                 Connect Schwab above for live quotes and rule-based levels.
               </p>
             )}
             {tradeSuggest?.noQuotes && tradeSuggest?.hint && (
-              <p className="mt-3 text-sm text-amber-100/90">{tradeSuggest.hint}</p>
+              <p className="mt-3 text-xl text-amber-100/90">{tradeSuggest.hint}</p>
             )}
             {tradeSuggest?.error && (
-              <p className="mt-2 text-xs text-rose-200/90">{tradeSuggest.error}</p>
+              <p className="mt-2 text-xl text-rose-200/90">{tradeSuggest.error}</p>
             )}
             {tradeSuggest?.cacheHit && (
-              <p className="mt-1 text-xs text-slate-500">Cached snapshot (short TTL).</p>
+              <p className="mt-1 text-xl text-slate-500">Cached snapshot (short TTL).</p>
             )}
             {Array.isArray(tradeSuggest?.suggestions) && tradeSuggest.suggestions.length > 0 && (
-              <div className="mt-4 space-y-5">
+              <div className="mt-5 space-y-6">
                 {tradeSuggest.suggestions.map((s) => (
                   <div
                     key={s.symbol}
-                    className="rounded-xl border border-surface-border bg-surface/40 px-4 py-4"
+                    className="rounded-xl border border-surface-border bg-slate-950/45 px-5 py-5 shadow-md ring-1 ring-white/[0.06]"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={() => setSelected(s.symbol)}
-                        className="font-mono text-lg font-semibold text-blue-200 hover:underline"
+                        className="font-mono text-xl font-semibold text-blue-200 hover:underline"
                       >
                         {s.symbol}
                       </button>
-                      <span className="text-xs text-muted">
+                      <span className="text-xl text-muted">
                         Score {s.score} · Last ${s.quote?.last}{" "}
                         {s.quote?.changePct != null && (
                           <span
@@ -1048,7 +1056,7 @@ export default function App() {
                       </span>
                     </div>
                     {s.ruleTargets && (
-                      <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                      <dl className="mt-4 grid gap-3 text-xl sm:grid-cols-2">
                         <div className="rounded-lg bg-black/20 px-2 py-2">
                           <dt className="text-muted">Entry zone</dt>
                           <dd className="font-mono text-slate-200">
@@ -1075,11 +1083,11 @@ export default function App() {
                       </dl>
                     )}
                     {s.claude?.thesis && (
-                      <div className="mt-3 text-sm leading-relaxed text-slate-300">
-                        <span className="text-xs font-semibold uppercase text-muted">Claude</span>
+                      <div className="mt-3 text-xl leading-relaxed text-slate-300">
+                        <span className="text-xl font-semibold uppercase tracking-wide text-muted">Claude</span>
                         <p className="mt-1">{s.claude.thesis}</p>
                         {s.claude.risks && (
-                          <p className="mt-2 text-xs text-rose-200/85">Risks: {s.claude.risks}</p>
+                          <p className="mt-2 text-xl text-rose-200/85">Risks: {s.claude.risks}</p>
                         )}
                         {s.claude.alignment === "needs_review" && (
                           <div className="mt-2">
@@ -1089,13 +1097,13 @@ export default function App() {
                       </div>
                     )}
                     {s.claudeError && (
-                      <p className="mt-2 text-xs text-amber-200/80">{s.claudeError}</p>
+                      <p className="mt-2 text-xl text-amber-200/80">{s.claudeError}</p>
                     )}
                     {s.claudeNote && (
-                      <p className="mt-2 text-xs text-muted">{s.claudeNote}</p>
+                      <p className="mt-2 text-xl text-muted">{s.claudeNote}</p>
                     )}
                     {Array.isArray(s.headlines) && s.headlines.length > 0 && (
-                      <ul className="mt-3 space-y-1 border-t border-surface-border pt-2 text-xs text-muted">
+                      <ul className="mt-3 space-y-1.5 border-t border-surface-border pt-3 text-xl text-muted leading-snug">
                         {s.headlines.map((h, i) => (
                           <li key={i}>
                             {h.url ? (
@@ -1125,54 +1133,54 @@ export default function App() {
               !tradeSuggest.noQuotes &&
               (!tradeSuggest.suggestions || tradeSuggest.suggestions.length === 0) &&
               !tradeSuggestErr && (
-                <p className="mt-3 text-sm text-muted">No suggestions after filtering quotes.</p>
+                <p className="mt-3 text-xl text-muted">No suggestions after filtering quotes.</p>
               )}
           </div>
 
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Research briefing
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-xl text-muted">
                 Themes + watchlist-style ideas (evidence-linked)
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-2 text-xl leading-relaxed text-muted">
               Merges your news feeds, dedupes headlines, then runs a two-step Claude pass. Symbols must
               appear in the merged corpus or discovery rank — not invented.{" "}
               {briefingLoading && <span className="text-slate-400">Generating…</span>}
             </p>
             {briefingErr && (
-              <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+              <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-xl text-rose-100">
                 {briefingErr}
               </p>
             )}
             {briefing?.disclaimer && (
-              <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-amber-100/90">
+              <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xl leading-relaxed text-amber-100/90">
                 {briefing.disclaimer}
               </p>
             )}
             {briefing?.skipped && briefing?.reason === "no_api_key" && !briefingLoading && (
-              <p className="mt-3 text-sm text-muted">
+              <p className="mt-3 text-xl text-muted">
                 Set <span className="font-mono text-slate-400">ANTHROPIC_API_KEY</span> in root{" "}
                 <span className="font-mono text-slate-400">.env</span> and refresh.
               </p>
             )}
             {briefing?.skipped && briefing?.reason === "thin_corpus" && !briefingLoading && (
-              <p className="mt-3 text-sm text-muted">
+              <p className="mt-3 text-xl text-muted">
                 Not enough headlines to brief yet. Check feeds and try Refresh.
               </p>
             )}
             {briefing?.error && !briefing?.skipped && (
-              <p className="mt-2 text-xs text-amber-200/90">Claude step: {briefing.error}</p>
+              <p className="mt-2 text-xl text-amber-200/90">Claude step: {briefing.error}</p>
             )}
             {briefing?.cacheHit && (
-              <p className="mt-1 text-xs text-slate-500">Cached briefing (same headline set).</p>
+              <p className="mt-1 text-xl text-slate-500">Cached briefing (same headline set).</p>
             )}
             {Array.isArray(briefing?.themes) && briefing.themes.length > 0 && (
-              <ul className="mt-4 space-y-3 text-sm">
+              <ul className="mt-4 space-y-3 text-xl">
                 {briefing.themes.map((t) => (
                   <li
                     key={t.id || t.title}
@@ -1180,7 +1188,7 @@ export default function App() {
                   >
                     <span className="font-medium text-slate-200">{t.title}</span>
                     {t.summary && (
-                      <p className="mt-1 text-xs leading-relaxed text-slate-400">{t.summary}</p>
+                      <p className="mt-1 text-xl leading-relaxed text-slate-400">{t.summary}</p>
                     )}
                   </li>
                 ))}
@@ -1188,10 +1196,10 @@ export default function App() {
             )}
             {Array.isArray(briefing?.uncertainties) && briefing.uncertainties.length > 0 && (
               <div className="mt-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                <h4 className="text-xl font-semibold uppercase tracking-wide text-muted">
                   Uncertainties
                 </h4>
-                <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-400">
+                <ul className="mt-2 list-inside list-disc space-y-1.5 text-xl text-slate-400">
                   {briefing.uncertainties.map((u, i) => (
                     <li key={i}>{u}</li>
                   ))}
@@ -1200,7 +1208,7 @@ export default function App() {
             )}
             {Array.isArray(briefing?.candidates) && briefing.candidates.length > 0 && (
               <div className="mt-4 space-y-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                <h4 className="text-xl font-semibold uppercase tracking-wide text-muted">
                   Research ideas (evidenced)
                 </h4>
                 {briefing.candidates.map((c) => (
@@ -1212,25 +1220,25 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setSelected(c.symbol)}
-                        className="font-mono text-base font-semibold text-blue-200 hover:underline"
+                        className="font-mono text-xl font-semibold text-blue-200 hover:underline"
                       >
                         {c.symbol}
                       </button>
                       <Badge tone="neutral">corpus-validated</Badge>
                     </div>
                     {c.thesis && (
-                      <p className="mt-2 text-xs leading-relaxed text-slate-300">{c.thesis}</p>
+                      <p className="mt-2 text-xl leading-relaxed text-slate-300">{c.thesis}</p>
                     )}
                     {c.risks && (
-                      <p className="mt-1 text-xs leading-relaxed text-rose-200/80">Risks: {c.risks}</p>
+                      <p className="mt-1 text-xl leading-relaxed text-rose-200/80">Risks: {c.risks}</p>
                     )}
                     {Array.isArray(c.verifyNext) && c.verifyNext.length > 0 && (
-                      <p className="mt-2 text-xs text-slate-500">
+                      <p className="mt-2 text-lg text-slate-500">
                         Verify: {c.verifyNext.join(" · ")}
                       </p>
                     )}
                     {Array.isArray(c.evidence) && c.evidence.length > 0 && (
-                      <ul className="mt-2 space-y-1 border-t border-surface-border pt-2 text-xs text-muted">
+                      <ul className="mt-2 space-y-1 border-t border-surface-border pt-2 text-lg text-muted">
                         {c.evidence.map((ev) => (
                           <li key={`${c.symbol}-${ev.bid}`}>
                             {ev.url ? (
@@ -1260,30 +1268,30 @@ export default function App() {
               (!briefing.themes || briefing.themes.length === 0) &&
               (!briefing.candidates || briefing.candidates.length === 0) &&
               !briefingErr && (
-                <p className="mt-3 text-sm text-muted">No themes or candidates returned.</p>
+                <p className="mt-3 text-xl text-muted">No themes or candidates returned.</p>
               )}
           </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-sky-500/25 bg-sky-950/20 p-6 shadow-xl shadow-black/25">
+          <div className="rounded-2xl border border-sky-500/25 bg-sky-950/20 p-7 shadow-xl shadow-black/25 ring-1 ring-white/[0.07]">
             <SectionHeading variant="chatgpt">ChatGPT</SectionHeading>
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-sky-500/20 bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-sky-500/20 bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-base font-semibold tracking-tight text-slate-50">
+                  <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                     Live trade suggestions
                   </h3>
-                  <span className="text-xs text-muted">
+                  <span className="text-lg text-muted">
                     Same rule levels as above · ChatGPT (OpenAI) narration
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-1 text-lg text-muted">
                   Uses the same Schwab batch as Claude; only the AI narrative differs.{" "}
                   {tradeSuggestLoading && <span className="text-slate-400">Loading…</span>}
                 </p>
                 {tradeSuggest?.disclaimer && (
-                  <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
+                  <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100/95">
                     {tradeSuggest.disclaimer}
                   </p>
                 )}
@@ -1295,18 +1303,18 @@ export default function App() {
                         className="rounded-xl border border-surface-border bg-surface/40 px-4 py-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-mono text-lg font-semibold text-sky-200">
+                          <span className="font-mono text-xl font-semibold text-sky-200">
                             {s.symbol}
                           </span>
                         </div>
                         {s.chatgpt?.thesis && (
-                          <div className="mt-3 text-sm leading-relaxed text-slate-300">
-                            <span className="text-xs font-semibold uppercase text-sky-300/90">
+                          <div className="mt-3 text-xl leading-relaxed text-slate-300">
+                            <span className="text-xl font-semibold uppercase text-sky-300/90">
                               ChatGPT
                             </span>
                             <p className="mt-1">{s.chatgpt.thesis}</p>
                             {s.chatgpt.risks && (
-                              <p className="mt-2 text-xs text-rose-200/85">Risks: {s.chatgpt.risks}</p>
+                              <p className="mt-2 text-xl text-rose-200/85">Risks: {s.chatgpt.risks}</p>
                             )}
                             {s.chatgpt.alignment === "needs_review" && (
                               <div className="mt-2">
@@ -1316,13 +1324,13 @@ export default function App() {
                           </div>
                         )}
                         {s.chatgptError && (
-                          <p className="mt-2 text-xs text-amber-200/80">{s.chatgptError}</p>
+                          <p className="mt-2 text-xl text-amber-200/80">{s.chatgptError}</p>
                         )}
                         {s.chatgptNote && (
-                          <p className="mt-2 text-xs text-muted">{s.chatgptNote}</p>
+                          <p className="mt-2 text-xl text-muted">{s.chatgptNote}</p>
                         )}
                         {!s.chatgpt?.thesis && !s.chatgptError && !s.chatgptNote && !tradeSuggestLoading && (
-                          <p className="mt-2 text-xs text-muted">No ChatGPT narrative for this row.</p>
+                          <p className="mt-2 text-lg text-muted">No ChatGPT narrative for this row.</p>
                         )}
                       </div>
                     ))}
@@ -1330,27 +1338,27 @@ export default function App() {
                 )}
               </div>
 
-              <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+              <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-base font-semibold tracking-tight text-slate-50">
+                  <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                     Research briefing
                   </h3>
-                  <span className="text-xs text-muted">
+                  <span className="text-lg text-muted">
                     Themes + watchlist-style ideas (evidence-linked)
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-1 text-lg text-muted">
                   Merges your news feeds, dedupes headlines, then runs a two-step OpenAI pass. Symbols must
                   appear in the merged corpus or discovery rank — not invented.{" "}
                   {briefingLoading && <span className="text-slate-400">Generating…</span>}
                 </p>
                 {briefingChatgpt?.disclaimer && (
-                  <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-amber-100/90">
+                  <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-lg text-amber-100/90">
                     {briefingChatgpt.disclaimer}
                   </p>
                 )}
                 {briefingChatgpt?.skipped && briefingChatgpt?.reason === "no_api_key" && !briefingLoading && (
-                  <p className="mt-3 text-sm text-muted">
+                  <p className="mt-3 text-xl text-muted">
                     Set <span className="font-mono text-slate-400">OPENAI_API_KEY</span> in root{" "}
                     <span className="font-mono text-slate-400">.env</span> and refresh (see{" "}
                     <a
@@ -1365,20 +1373,20 @@ export default function App() {
                   </p>
                 )}
                 {briefingChatgpt?.skipped && briefingChatgpt?.reason === "thin_corpus" && !briefingLoading && (
-                  <p className="mt-3 text-sm text-muted">
+                  <p className="mt-3 text-xl text-muted">
                     Not enough headlines to brief yet. Check feeds and try Refresh.
                   </p>
                 )}
                 {briefingChatgpt?.error && !briefingChatgpt?.skipped && (
-                  <p className="mt-2 text-xs text-amber-200/90">
+                  <p className="mt-2 text-lg text-amber-200/90">
                     OpenAI step: {briefingChatgpt.error}
                   </p>
                 )}
                 {briefingChatgpt?.cacheHit && (
-                  <p className="mt-1 text-xs text-slate-500">Cached briefing (same headline set).</p>
+                  <p className="mt-1 text-lg text-slate-500">Cached briefing (same headline set).</p>
                 )}
                 {Array.isArray(briefingChatgpt?.themes) && briefingChatgpt.themes.length > 0 && (
-                  <ul className="mt-4 space-y-3 text-sm">
+                  <ul className="mt-4 space-y-3 text-xl">
                     {briefingChatgpt.themes.map((t) => (
                       <li
                         key={`gpt-${t.id || t.title}`}
@@ -1386,7 +1394,7 @@ export default function App() {
                       >
                         <span className="font-medium text-slate-200">{t.title}</span>
                         {t.summary && (
-                          <p className="mt-1 text-xs leading-relaxed text-slate-400">{t.summary}</p>
+                          <p className="mt-1 text-xl leading-relaxed text-slate-400">{t.summary}</p>
                         )}
                       </li>
                     ))}
@@ -1395,10 +1403,10 @@ export default function App() {
                 {Array.isArray(briefingChatgpt?.uncertainties) &&
                   briefingChatgpt.uncertainties.length > 0 && (
                     <div className="mt-4">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      <h4 className="text-xl font-semibold uppercase tracking-wide text-muted">
                         Uncertainties
                       </h4>
-                      <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-400">
+                      <ul className="mt-2 list-inside list-disc space-y-1 text-lg text-slate-400">
                         {briefingChatgpt.uncertainties.map((u, i) => (
                           <li key={i}>{u}</li>
                         ))}
@@ -1407,7 +1415,7 @@ export default function App() {
                   )}
                 {Array.isArray(briefingChatgpt?.candidates) && briefingChatgpt.candidates.length > 0 && (
                   <div className="mt-4 space-y-4">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    <h4 className="text-xl font-semibold uppercase tracking-wide text-muted">
                       Research ideas (evidenced)
                     </h4>
                     {briefingChatgpt.candidates.map((c) => (
@@ -1419,22 +1427,22 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setSelected(c.symbol)}
-                            className="font-mono text-base font-semibold text-sky-200 hover:underline"
+                            className="font-mono text-xl font-semibold text-sky-200 hover:underline"
                           >
                             {c.symbol}
                           </button>
                           <Badge tone="neutral">corpus-validated</Badge>
                         </div>
                         {c.thesis && (
-                          <p className="mt-2 text-xs leading-relaxed text-slate-300">{c.thesis}</p>
+                          <p className="mt-2 text-xl leading-relaxed text-slate-300">{c.thesis}</p>
                         )}
                         {c.risks && (
-                          <p className="mt-1 text-xs leading-relaxed text-rose-200/80">
+                          <p className="mt-1 text-xl leading-relaxed text-rose-200/80">
                             Risks: {c.risks}
                           </p>
                         )}
                         {Array.isArray(c.evidence) && c.evidence.length > 0 && (
-                          <ul className="mt-2 space-y-1 border-t border-surface-border pt-2 text-xs text-muted">
+                          <ul className="mt-2 space-y-1 border-t border-surface-border pt-2 text-lg text-muted">
                             {c.evidence.map((ev) => (
                               <li key={`gpt-${c.symbol}-${ev.bid}`}>
                                 {ev.url ? (
@@ -1464,31 +1472,31 @@ export default function App() {
                   (!briefingChatgpt.themes || briefingChatgpt.themes.length === 0) &&
                   (!briefingChatgpt.candidates || briefingChatgpt.candidates.length === 0) &&
                   !briefingChatgpt?.error && (
-                    <p className="mt-3 text-sm text-muted">No themes or candidates returned.</p>
+                    <p className="mt-3 text-xl text-muted">No themes or candidates returned.</p>
                   )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-teal-500/25 bg-teal-950/15 p-6 shadow-xl shadow-black/25">
+          <div className="rounded-2xl border border-teal-500/25 bg-teal-950/15 p-7 shadow-xl shadow-black/25 ring-1 ring-white/[0.07]">
             <SectionHeading variant="news">News</SectionHeading>
-            <div className="space-y-5">
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+            <div className="space-y-6">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Seeking Alpha
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-lg text-muted">
                 RapidAPI · consensus ratings (get-ratings)
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-lg text-muted">
               Quant, author, and sell-side scores from Seeking Alpha — same{" "}
               <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> after you subscribe to
               the Seeking Alpha API on RapidAPI.
             </p>
             {discover?.news?.errors?.find((e) => e.source === "seeking_alpha") && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100">
                 Seeking Alpha:{" "}
                 {
                   discover.news.errors.find((e) => e.source === "seeking_alpha")
@@ -1496,9 +1504,9 @@ export default function App() {
                 }
               </p>
             )}
-            <ul className="mt-4 max-h-72 space-y-4 overflow-y-auto pr-1 text-sm">
+            <ul className="mt-4 max-h-72 space-y-4 overflow-y-auto pr-1 text-xl">
               {(discover?.seekingAlpha || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-xl text-muted">
                   No Seeking Alpha data yet. Use your RapidAPI application key in root{" "}
                   <span className="font-mono text-slate-400">.env</span> as{" "}
                   <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>, subscribe to
@@ -1518,19 +1526,19 @@ export default function App() {
                   >
                     {item.title}
                   </a>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  <p className="mt-1 text-xl leading-relaxed text-slate-400">
                     {item.description}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {item.symbol && <Badge tone="neutral">{item.symbol}</Badge>}
                     {item.ratings?.quantRating != null && (
-                      <span className="text-xs text-muted">
+                      <span className="text-lg text-muted">
                         Quant {Number(item.ratings.quantRating).toFixed(2)}
                       </span>
                     )}
                     {item.ratings?.asDate && (
                       <time
-                        className="text-xs text-slate-500"
+                        className="text-lg text-slate-500"
                         dateTime={item.publishedAt}
                       >
                         {item.ratings.asDate}
@@ -1542,23 +1550,23 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Real-time finance data
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-lg text-muted">
                 {"RapidAPI · stock & currency headlines"}
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-lg text-muted">
               Latest items from your Real-Time Finance Data subscription (refreshes with{" "}
               <span className="font-mono text-slate-400">Refresh</span> above).
             </p>
             {discover?.news?.errors?.find(
               (e) => e.source === "rapidapi_realtime_finance"
             ) && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100">
                 Real-Time Finance API:{" "}
                 {
                   discover.news.errors.find(
@@ -1567,9 +1575,9 @@ export default function App() {
                 }
               </p>
             )}
-            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-xl">
               {(discover?.realtimeFinanceNews || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-xl text-muted">
                   No real-time finance headlines yet. Add{" "}
                   <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> to the{" "}
                   <span className="font-mono text-slate-400">.env</span> file at the{" "}
@@ -1596,7 +1604,7 @@ export default function App() {
                   >
                     {n.title}
                   </a>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-lg text-muted">
                     <span>{n.source}</span>
                     {n.realtimeContext && (
                       <Badge tone="neutral">{n.realtimeContext}</Badge>
@@ -1620,16 +1628,16 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Yahoo Finance
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-lg text-muted">
                 RapidAPI · YH Finance · /v1/markets/news + ticker (see .env.example)
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-lg text-muted">
               Market headlines — use{" "}
               <span className="font-mono text-slate-400">YH_FINANCE_REQUEST_URL</span> (full URL from
               RapidAPI Code snippets) or defaults:{" "}
@@ -1639,7 +1647,7 @@ export default function App() {
               <span className="font-mono text-slate-400">YH_FINANCE_RAPIDAPI_KEY</span>.
             </p>
             {discover?.news?.errors?.find((e) => e.source === "yahoo_finance_api") && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100">
                 Yahoo Finance API:{" "}
                 {
                   discover.news.errors.find((e) => e.source === "yahoo_finance_api")
@@ -1647,9 +1655,9 @@ export default function App() {
                 }
               </p>
             )}
-            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-xl">
               {(discover?.yahooFinanceNews || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-xl text-muted">
                   No Yahoo Finance headlines yet. Set <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>{" "}
                   in root <span className="font-mono text-slate-400">.env</span>, subscribe to{" "}
                   <strong className="font-medium text-slate-300">YH Finance</strong> on RapidAPI,
@@ -1670,12 +1678,12 @@ export default function App() {
                     {n.title}
                   </a>
                   {n.description && (
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    <p className="mt-1 text-xl leading-relaxed text-slate-500">
                       {(n.description || "").slice(0, 280)}
                       {(n.description || "").length > 280 ? "…" : ""}
                     </p>
                   )}
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-lg text-muted">
                     <span>{n.source}</span>
                     {n.publishedAt && (
                       <time className="text-slate-500" dateTime={n.publishedAt}>
@@ -1693,16 +1701,16 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 CNBC
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-lg text-muted">
                 RapidAPI · cnbc-markets-and-news-data.p.rapidapi.com
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-lg text-muted">
               Headlines from the CNBC Markets &amp; News Data API — same root{" "}
               <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> after you subscribe on
               RapidAPI.
@@ -1710,7 +1718,7 @@ export default function App() {
             {discover?.news?.errors?.find(
               (e) => e.source === "cnbc_markets_news_api"
             ) && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100">
                 CNBC API:{" "}
                 {
                   discover.news.errors.find(
@@ -1719,9 +1727,9 @@ export default function App() {
                 }
               </p>
             )}
-            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-xl">
               {(discover?.cnbcMarketsNews || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-xl text-muted">
                   No CNBC headlines yet. Set root <span className="font-mono text-slate-400">.env</span>{" "}
                   <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>, subscribe to{" "}
                   <strong className="font-medium text-slate-300">CNBC Markets and News Data</strong>{" "}
@@ -1742,7 +1750,7 @@ export default function App() {
                   >
                     {n.title}
                   </a>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-lg text-muted">
                     <span>{n.source}</span>
                     {n.cnbcCategory && (
                       <Badge tone="neutral">{n.cnbcCategory}</Badge>
@@ -1756,16 +1764,16 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Reuters
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-lg text-muted">
                 RapidAPI · reuters-business-and-financial-news.p.rapidapi.com
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-lg text-muted">
               Business and financial articles (date range) — same root{" "}
               <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> after you subscribe to
               Reuters Business and Financial News on RapidAPI.
@@ -1773,7 +1781,7 @@ export default function App() {
             {discover?.news?.errors?.find(
               (e) => e.source === "reuters_business_news_api"
             ) && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100">
                 Reuters API:{" "}
                 {
                   discover.news.errors.find(
@@ -1782,9 +1790,9 @@ export default function App() {
                 }
               </p>
             )}
-            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-xl">
               {(discover?.reutersBusinessNews || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-xl text-muted">
                   No Reuters articles yet. Set root <span className="font-mono text-slate-400">.env</span>{" "}
                   <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>, subscribe to{" "}
                   <strong className="font-medium text-slate-300">
@@ -1808,11 +1816,11 @@ export default function App() {
                     {n.title}
                   </a>
                   {n.description && (
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    <p className="mt-1 text-xl leading-relaxed text-slate-500">
                       {n.description}
                     </p>
                   )}
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-lg text-muted">
                     <span>{n.source}</span>
                     {n.categoryName && <Badge tone="neutral">{n.categoryName}</Badge>}
                     {n.publishedAt && (
@@ -1831,16 +1839,16 @@ export default function App() {
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-50">
                 Real-time News Data
               </h3>
-              <span className="text-xs text-muted">
+              <span className="text-lg text-muted">
                 RapidAPI · real-time-news-data.p.rapidapi.com
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-lg text-muted">
               Top business headlines via your RapidAPI app key (
               <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> in root{" "}
               <span className="font-mono text-slate-400">.env</span>). Subscribe to{" "}
@@ -1850,7 +1858,7 @@ export default function App() {
             {discover?.news?.errors?.find(
               (e) => e.source === "realtime_news_data_api"
             ) && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-lg text-amber-100">
                 Real-Time News Data API:{" "}
                 {
                   discover.news.errors.find(
@@ -1859,9 +1867,9 @@ export default function App() {
                 }
               </p>
             )}
-            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-xl">
               {(discover?.realTimeNewsData || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-xl text-muted">
                   No headlines yet. Set root <span className="font-mono text-slate-400">.env</span>{" "}
                   <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>, subscribe to the
                   Real-Time News Data API on RapidAPI, restart{" "}
@@ -1882,11 +1890,11 @@ export default function App() {
                     {n.title}
                   </a>
                   {n.description && (
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    <p className="mt-1 text-xl leading-relaxed text-slate-500">
                       {n.description}
                     </p>
                   )}
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-lg text-muted">
                     <span>{n.source}</span>
                     {n.publishedAt && (
                       <time className="text-slate-500" dateTime={n.publishedAt}>
@@ -1906,12 +1914,12 @@ export default function App() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-500/35 bg-slate-950/35 p-6 shadow-xl shadow-black/25">
+          <div className="rounded-2xl border border-slate-500/35 bg-slate-950/35 p-7 shadow-xl shadow-black/25 ring-1 ring-white/[0.07]">
             <SectionHeading variant="discovery">Discovery</SectionHeading>
-            <div className="space-y-5">
-          <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-card/90 shadow-xl shadow-black/40">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-surface/80 text-xs uppercase text-muted">
+            <div className="space-y-6">
+          <div className="overflow-hidden rounded-2xl border border-surface-border bg-surface-card/90 shadow-xl shadow-black/40 ring-1 ring-black/20">
+            <table className="w-full text-left text-xl">
+              <thead className="bg-surface/80 text-xl uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">Symbol</th>
                   <th className="px-4 py-3 font-medium">Score</th>
@@ -1927,9 +1935,9 @@ export default function App() {
                     }`}
                     onClick={() => setSelected(row.symbol)}
                   >
-                    <td className="px-4 py-3 font-mono font-medium">{row.symbol}</td>
-                    <td className="px-4 py-3 text-muted">{row.score.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-xs text-slate-400">
+                    <td className="px-4 py-3 font-mono text-xl font-medium">{row.symbol}</td>
+                    <td className="px-4 py-3 text-xl text-muted">{row.score.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-lg text-slate-400">
                       {(row.reasons || []).slice(0, 4).join(" · ")}
                     </td>
                   </tr>
@@ -1938,16 +1946,16 @@ export default function App() {
             </table>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-xl shadow-black/40">
-            <h3 className="mb-4 text-base font-semibold tracking-tight text-slate-200">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-xl shadow-black/40 ring-1 ring-black/20">
+            <h3 className="mb-4 text-2xl font-semibold tracking-tight text-slate-200">
               News mention intensity
             </h3>
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e2636" />
-                  <XAxis dataKey="symbol" stroke="#8b9cb5" tick={{ fontSize: 11 }} />
-                  <YAxis stroke="#8b9cb5" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="symbol" stroke="#8b9cb5" tick={{ fontSize: 12 }} />
+                  <YAxis stroke="#8b9cb5" tick={{ fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
                       background: "#121722",
@@ -1964,11 +1972,11 @@ export default function App() {
           </div>
         </section>
 
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-5 shadow-xl shadow-black/40">
+        <aside className="space-y-6">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-6 shadow-xl shadow-black/40 ring-1 ring-white/[0.06]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h2 className="text-lg font-semibold">{selected || "—"}</h2>
+                <h2 className="text-2xl font-semibold">{selected || "—"}</h2>
                 {(tradeAiView?.quote?.last != null || analysis?.analysis?.price != null) && (
                   <span className="font-mono text-slate-100">
                     ${fmtPrice(tradeAiView?.quote?.last ?? analysis?.analysis?.price)}
@@ -1983,10 +1991,10 @@ export default function App() {
               )}
             </div>
             {analysisLoading && (
-              <p className="mt-3 text-sm text-muted">Pulling analysis…</p>
+              <p className="mt-3 text-xl text-muted">Pulling analysis…</p>
             )}
             {analysis?.analysis && (
-              <dl className="mt-4 space-y-3 text-sm">
+              <dl className="mt-4 space-y-3 text-xl">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted">Price</dt>
                   <dd className="font-mono">{analysis.analysis.price}</dd>
@@ -1999,7 +2007,7 @@ export default function App() {
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted">MACD</dt>
-                  <dd className="font-mono text-xs">
+                  <dd className="font-mono text-xl">
                     {analysis.analysis.macd
                       ? JSON.stringify(analysis.analysis.macd)
                       : "—"}
@@ -2013,63 +2021,63 @@ export default function App() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-5 shadow-xl shadow-black/40">
-            <h3 className="text-sm font-semibold text-muted">AI insight</h3>
-            <div className="mt-3 space-y-4">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-6 shadow-xl shadow-black/40 ring-1 ring-white/[0.06]">
+            <h3 className="text-2xl font-semibold text-slate-200">AI insight</h3>
+            <div className="mt-4 space-y-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-violet-300/90">
+                <p className="text-xl font-semibold uppercase tracking-wide text-violet-300/90">
                   Claude
                 </p>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+                <div className="mt-2 whitespace-pre-wrap text-xl leading-relaxed text-slate-200">
                   {analysis?.insight?.text || "Select a symbol or wait for analysis."}
                 </div>
                 {analysis?.insight?.provider && (
-                  <p className="mt-2 text-xs text-muted">
+                  <p className="mt-2 text-xl text-muted">
                     Provider: {analysis.insight.provider}
                   </p>
                 )}
               </div>
-              <div className="border-t border-surface-border pt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-sky-300/90">
+              <div className="border-t border-surface-border pt-5">
+                <p className="text-xl font-semibold uppercase tracking-wide text-sky-300/90">
                   ChatGPT
                 </p>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+                <div className="mt-2 whitespace-pre-wrap text-xl leading-relaxed text-slate-200">
                   {analysisLoading && !analysis?.insightChatgpt?.text
                     ? "…"
                     : analysis?.insightChatgpt?.text ||
                       "OpenAI insight appears when OPENAI_API_KEY is set and insight is requested."}
                 </div>
                 {analysis?.insightChatgpt?.provider && (
-                  <p className="mt-2 text-xs text-muted">
+                  <p className="mt-2 text-xl text-muted">
                     Provider: {analysis.insightChatgpt.provider}
                   </p>
                 )}
                 {analysis?.insightChatgpt?.error && (
-                  <p className="mt-2 text-xs text-amber-200/85">{analysis.insightChatgpt.error}</p>
+                  <p className="mt-2 text-xl text-amber-200/85">{analysis.insightChatgpt.error}</p>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-5 shadow-xl shadow-black/40">
-            <h3 className="text-sm font-semibold text-muted">AI trade view (selected ticker)</h3>
-            <p className="mt-1 text-xs text-muted">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-6 shadow-xl shadow-black/40 ring-1 ring-white/[0.06]">
+            <h3 className="text-2xl font-semibold text-slate-200">AI trade view (selected ticker)</h3>
+            <p className="mt-2 text-xl leading-relaxed text-muted">
               Schwab quote + ATR rule levels + latest headlines; Claude and ChatGPT add bias and copy.{" "}
               {tradeAiViewLoading && <span className="text-slate-400">Loading…</span>}
             </p>
             {tradeAiView?.disclaimer && (
-              <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-100/90">
+              <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xl leading-relaxed text-amber-100/90">
                 {tradeAiView.disclaimer}
               </p>
             )}
             {tradeAiView?.needsSchwab && !tradeAiViewLoading && (
-              <p className="mt-2 text-xs text-muted">Connect Schwab in the header for live levels.</p>
+              <p className="mt-2 text-xl text-muted">Connect Schwab in the header for live levels.</p>
             )}
             {tradeAiView?.error && (
-              <p className="mt-2 text-xs text-rose-200/90">{tradeAiView.error}</p>
+              <p className="mt-2 text-xl text-rose-200/90">{tradeAiView.error}</p>
             )}
             {tradeAiView?.ruleTargets && (
-              <dl className="mt-3 space-y-2 text-xs">
+              <dl className="mt-4 space-y-2.5 text-xl">
                 <div className="flex justify-between gap-2">
                   <dt className="text-muted">Entry</dt>
                   <dd className="font-mono text-slate-200">
@@ -2088,14 +2096,14 @@ export default function App() {
                 </div>
               </dl>
             )}
-            <div className="mt-3 border-t border-surface-border pt-3">
-              <p className="text-xs font-semibold text-slate-300">Schwab price history</p>
+            <div className="mt-4 border-t border-surface-border pt-4">
+              <p className="text-xl font-semibold text-slate-300">Schwab price history</p>
               <div className="mt-2">
                 <PriceRangePicker value={sidebarPriceRange} onChange={setSidebarPriceRange} />
               </div>
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-4">
                 <div>
-                  <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted">
+                  <p className="mb-2 text-xl font-semibold uppercase tracking-wide text-slate-400">
                     Close price ({sidebarPriceRange})
                   </p>
                   <PriceHistoryChart
@@ -2107,7 +2115,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted">
+                  <p className="mb-2 text-xl font-semibold uppercase tracking-wide text-slate-400">
                     OHLC table
                   </p>
                   <PriceHistoryTable
@@ -2121,8 +2129,8 @@ export default function App() {
               </div>
             </div>
             {tradeAiView?.claude && (
-              <div className="mt-3 border-t border-surface-border pt-3">
-                <p className="text-xs font-semibold uppercase text-violet-300/90">Claude</p>
+              <div className="mt-4 border-t border-surface-border pt-4">
+                <p className="text-xl font-semibold uppercase tracking-wide text-violet-300/90">Claude</p>
                 <div className="mt-1">
                   <Badge
                     tone={
@@ -2136,18 +2144,18 @@ export default function App() {
                     {tradeAiView.claude.bias}
                   </Badge>
                 </div>
-                <p className="mt-2 text-sm leading-relaxed text-slate-200">{tradeAiView.claude.thesis}</p>
+                <p className="mt-2 text-xl leading-relaxed text-slate-200">{tradeAiView.claude.thesis}</p>
                 {tradeAiView.claude.risks && (
-                  <p className="mt-1 text-xs text-rose-200/80">Risks: {tradeAiView.claude.risks}</p>
+                  <p className="mt-1 text-xl text-rose-200/80">Risks: {tradeAiView.claude.risks}</p>
                 )}
               </div>
             )}
             {tradeAiView?.claudeError && (
-              <p className="mt-2 text-xs text-amber-200/85">{tradeAiView.claudeError}</p>
+              <p className="mt-2 text-xl text-amber-200/85">{tradeAiView.claudeError}</p>
             )}
             {tradeAiView?.openai && (
-              <div className="mt-3 border-t border-surface-border pt-3">
-                <p className="text-xs font-semibold uppercase text-sky-300/90">ChatGPT</p>
+              <div className="mt-4 border-t border-surface-border pt-4">
+                <p className="text-xl font-semibold uppercase tracking-wide text-sky-300/90">ChatGPT</p>
                 <div className="mt-1">
                   <Badge
                     tone={
@@ -2161,31 +2169,31 @@ export default function App() {
                     {tradeAiView.openai.bias}
                   </Badge>
                 </div>
-                <p className="mt-2 text-sm leading-relaxed text-slate-200">{tradeAiView.openai.thesis}</p>
+                <p className="mt-2 text-xl leading-relaxed text-slate-200">{tradeAiView.openai.thesis}</p>
                 {tradeAiView.openai.risks && (
-                  <p className="mt-1 text-xs text-rose-200/80">Risks: {tradeAiView.openai.risks}</p>
+                  <p className="mt-1 text-xl text-rose-200/80">Risks: {tradeAiView.openai.risks}</p>
                 )}
               </div>
             )}
             {tradeAiView?.openaiError && (
-              <p className="mt-2 text-xs text-amber-200/85">{tradeAiView.openaiError}</p>
+              <p className="mt-2 text-xl text-amber-200/85">{tradeAiView.openaiError}</p>
             )}
           </div>
 
-          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-5 shadow-xl shadow-black/40">
-            <h3 className="text-sm font-semibold text-muted">Related headlines</h3>
-            <ul className="mt-3 space-y-3 text-sm">
+          <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-6 shadow-xl shadow-black/40 ring-1 ring-white/[0.06]">
+            <h3 className="text-2xl font-semibold text-slate-200">Related headlines</h3>
+            <ul className="mt-4 space-y-3 text-xl">
               {(analysis?.relatedNews || []).map((n) => (
                 <li key={n.id} className="border-b border-surface-border pb-3 last:border-0">
                   <a
                     href={n.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium text-blue-200 hover:underline"
+                    className="text-xl font-medium text-blue-200 hover:underline"
                   >
                     {n.title}
                   </a>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 text-xl text-muted">
                     {n.source}
                     {Array.isArray(n.categories) && n.categories.length > 0 && (
                       <span className="text-slate-500">
