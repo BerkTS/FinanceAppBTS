@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -18,6 +20,228 @@ async function fetchJson(path) {
   const res = await fetch(`${API}${path}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+const PRICE_RANGES = ["1D", "5D", "1M", "3M", "6M", "1Y", "5Y"];
+
+function fmtPrice(n) {
+  if (n == null || !Number.isFinite(Number(n))) return "—";
+  return Number(n).toFixed(2);
+}
+
+function fmtVol(v) {
+  if (v == null || !Number.isFinite(v)) return "—";
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
+  return String(Math.round(v));
+}
+
+function formatCandleCell(iso, range) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (range === "1D") {
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(range === "5Y" ? { year: "numeric" } : {}),
+  });
+}
+
+function PriceRangePicker({ value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Price history range">
+      {PRICE_RANGES.map((r) => (
+        <button
+          key={r}
+          type="button"
+          onClick={() => onChange(r)}
+          className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition ${
+            value === r
+              ? "bg-emerald-500/25 text-emerald-100 border border-emerald-500/40"
+              : "border border-surface-border text-muted hover:text-slate-200"
+          }`}
+        >
+          {r}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function tickTimeLabel(t, range) {
+  if (t == null || !Number.isFinite(Number(t))) return "";
+  const iso = new Date(Number(t)).toISOString();
+  if (range === "1D") {
+    return new Date(Number(t)).toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  return new Date(Number(t)).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(range === "5Y" || range === "1Y" ? { year: "2-digit" } : {}),
+  });
+}
+
+/** Line + filled area (Apple Stocks–style), same data as the OHLC table. */
+function PriceHistoryChart({ rows, loading, error, needsSchwab, range, compact = false }) {
+  const gradId = useRef(`ph-fill-${Math.random().toString(36).slice(2, 9)}`).current;
+  const chartH = compact ? 168 : 220;
+
+  const prepared = useMemo(() => {
+    const list = Array.isArray(rows) ? rows.filter((r) => r && Number.isFinite(Number(r.close))) : [];
+    return [...list].sort((a, b) => Number(a.time) - Number(b.time));
+  }, [rows]);
+
+  const stroke = useMemo(() => {
+    if (prepared.length < 2) return "#34d399";
+    const a = Number(prepared[0].close);
+    const b = Number(prepared[prepared.length - 1].close);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return "#34d399";
+    return b >= a ? "#34d399" : "#fb7185";
+  }, [prepared]);
+
+  const textSize = compact ? "text-[10px]" : "text-xs";
+  if (needsSchwab) {
+    return <p className={`text-muted ${textSize}`}>Connect Schwab for price history.</p>;
+  }
+  if (error) {
+    return <p className={`text-rose-200/85 ${textSize}`}>{error}</p>;
+  }
+  if (loading) {
+    return <p className={`text-muted ${textSize}`}>Loading chart…</p>;
+  }
+  if (prepared.length < 2) {
+    return <p className={`text-muted ${textSize}`}>Not enough bars to draw a chart.</p>;
+  }
+
+  const tMin = prepared[0].time;
+  const tMax = prepared[prepared.length - 1].time;
+
+  return (
+    <div
+      className={`w-full rounded-lg border border-surface-border bg-black/15 ${
+        compact ? "px-1 pt-1" : "px-1 pt-2"
+      }`}
+      style={{ height: chartH }}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={prepared} margin={{ top: 6, right: 6, left: 0, bottom: 2 }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={stroke} stopOpacity={0.45} />
+              <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical />
+          <XAxis
+            type="number"
+            dataKey="time"
+            domain={[tMin, tMax]}
+            scale="time"
+            tickFormatter={(t) => tickTimeLabel(t, range)}
+            tick={{ fill: "#64748b", fontSize: compact ? 9 : 10 }}
+            axisLine={{ stroke: "#334155" }}
+            tickLine={false}
+            minTickGap={compact ? 24 : 36}
+          />
+          <YAxis
+            orientation="right"
+            domain={["auto", "auto"]}
+            width={compact ? 36 : 44}
+            tick={{ fill: "#64748b", fontSize: compact ? 9 : 10 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => (Number.isFinite(v) ? Number(v).toFixed(0) : "")}
+          />
+          <Tooltip
+            cursor={{ stroke: "#475569", strokeWidth: 1 }}
+            contentStyle={{
+              background: "#121722",
+              border: "1px solid #1e2636",
+              borderRadius: 8,
+              fontSize: 11,
+            }}
+            labelFormatter={(t) => formatCandleCell(new Date(Number(t)).toISOString(), range)}
+            formatter={(v) => [`$${fmtPrice(v)}`, "Close"]}
+          />
+          <Area
+            type="monotone"
+            dataKey="close"
+            stroke={stroke}
+            strokeWidth={compact ? 1.5 : 2}
+            fill={`url(#${gradId})`}
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 0, fill: stroke }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function PriceHistoryTable({ rows, loading, error, needsSchwab, range, compact = false }) {
+  const textSize = compact ? "text-[10px]" : "text-xs";
+  if (needsSchwab) {
+    return (
+      <p className={`text-muted ${textSize}`}>Connect Schwab for OHLC history.</p>
+    );
+  }
+  if (error) {
+    return <p className={`text-rose-200/85 ${textSize}`}>{error}</p>;
+  }
+  if (loading) {
+    return <p className={`text-muted ${textSize}`}>Loading bars…</p>;
+  }
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    return <p className={`text-muted ${textSize}`}>No bars for this range.</p>;
+  }
+  const tail = compact ? list.slice(-16) : list.slice(-80);
+  const ordered = [...tail].reverse();
+  return (
+    <div
+      className={`overflow-x-auto rounded-lg border border-surface-border bg-black/15 ${
+        compact ? "max-h-36 overflow-y-auto" : "max-h-56 overflow-y-auto"
+      }`}
+    >
+      <table className={`w-full text-left font-mono text-slate-300 ${textSize}`}>
+        <thead className="sticky top-0 bg-surface/95 text-[10px] uppercase text-muted">
+          <tr>
+            <th className="px-2 py-1.5 font-medium">Date</th>
+            <th className="px-2 py-1.5 font-medium">O</th>
+            <th className="px-2 py-1.5 font-medium">H</th>
+            <th className="px-2 py-1.5 font-medium">L</th>
+            <th className="px-2 py-1.5 font-medium">C</th>
+            <th className="px-2 py-1.5 font-medium">Vol</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ordered.map((row) => (
+            <tr key={`${row.time}-${row.date}`} className="border-t border-surface-border/60">
+              <td className="whitespace-nowrap px-2 py-1 text-slate-400">
+                {formatCandleCell(row.date, range)}
+              </td>
+              <td className="px-2 py-1">{fmtPrice(row.open)}</td>
+              <td className="px-2 py-1">{fmtPrice(row.high)}</td>
+              <td className="px-2 py-1">{fmtPrice(row.low)}</td>
+              <td className="px-2 py-1 text-slate-100">{fmtPrice(row.close)}</td>
+              <td className="px-2 py-1 text-slate-500">{fmtVol(row.volume)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function Badge({ children, tone = "neutral" }) {
@@ -77,6 +301,15 @@ export default function App() {
   const [tradeAiBulkErr, setTradeAiBulkErr] = useState(null);
   const [tradeAiView, setTradeAiView] = useState(null);
   const [tradeAiViewLoading, setTradeAiViewLoading] = useState(false);
+  const [sidebarPriceRange, setSidebarPriceRange] = useState("1M");
+  const [sidebarPriceHistory, setSidebarPriceHistory] = useState({
+    candles: [],
+    loading: false,
+    error: null,
+    needsSchwab: false,
+  });
+  const [bulkPriceRange, setBulkPriceRange] = useState("1M");
+  const [bulkPriceBySymbol, setBulkPriceBySymbol] = useState({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [schwabConnected, setSchwabConnected] = useState(false);
   const historyCaptureRef = useRef(null);
@@ -228,6 +461,128 @@ export default function App() {
       cancelled = true;
     };
   }, [selected, sessionId]);
+
+  useEffect(() => {
+    if (!selected) {
+      setSidebarPriceHistory({
+        candles: [],
+        loading: false,
+        error: null,
+        needsSchwab: false,
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    setSidebarPriceHistory((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+    }));
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API}/stocks/${encodeURIComponent(selected)}/price-history?sessionId=${encodeURIComponent(sessionId)}&range=${encodeURIComponent(sidebarPriceRange)}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setSidebarPriceHistory({
+            candles: [],
+            loading: false,
+            error: data.error || `HTTP ${res.status}`,
+            needsSchwab: false,
+          });
+          return;
+        }
+        setSidebarPriceHistory({
+          candles: data.candles || [],
+          loading: false,
+          error: data.error || null,
+          needsSchwab: !!data.needsSchwab,
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setSidebarPriceHistory({
+            candles: [],
+            loading: false,
+            error: String(e.message || e),
+            needsSchwab: false,
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, sessionId, sidebarPriceRange]);
+
+  useEffect(() => {
+    const views = tradeAiBulk?.views;
+    if (!Array.isArray(views) || views.length === 0) {
+      setBulkPriceBySymbol({});
+      return undefined;
+    }
+    const symbols = views.map((v) => String(v.symbol || "").toUpperCase()).filter(Boolean);
+    let cancelled = false;
+
+    setBulkPriceBySymbol(() => {
+      const next = {};
+      for (const s of symbols) {
+        next[s] = { candles: [], loading: true, error: null, needsSchwab: false };
+      }
+      return next;
+    });
+
+    (async () => {
+      await Promise.all(
+        symbols.map(async (sym) => {
+          try {
+            const res = await fetch(
+              `${API}/stocks/${encodeURIComponent(sym)}/price-history?sessionId=${encodeURIComponent(sessionId)}&range=${encodeURIComponent(bulkPriceRange)}`
+            );
+            const data = await res.json();
+            if (cancelled) return;
+            if (!res.ok) {
+              setBulkPriceBySymbol((prev) => ({
+                ...prev,
+                [sym]: {
+                  candles: [],
+                  loading: false,
+                  error: data.error || `HTTP ${res.status}`,
+                  needsSchwab: false,
+                },
+              }));
+              return;
+            }
+            setBulkPriceBySymbol((prev) => ({
+              ...prev,
+              [sym]: {
+                candles: data.candles || [],
+                loading: false,
+                error: data.error || null,
+                needsSchwab: !!data.needsSchwab,
+              },
+            }));
+          } catch (e) {
+            if (cancelled) return;
+            setBulkPriceBySymbol((prev) => ({
+              ...prev,
+              [sym]: {
+                candles: [],
+                loading: false,
+                error: String(e.message || e),
+                needsSchwab: false,
+              },
+            }));
+          }
+        })
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tradeAiBulk, bulkPriceRange, sessionId]);
 
   const chartData = useMemo(() => {
     const tickers = discover?.newsTickers?.slice(0, 8) || [];
@@ -479,12 +834,19 @@ export default function App() {
             )}
             {Array.isArray(tradeAiBulk?.views) && tradeAiBulk.views.length > 0 && (
               <div className="mt-4 space-y-6">
-                {tradeAiBulk.views.map((row) => (
+                <div className="flex flex-wrap items-center gap-3 border-b border-emerald-500/20 pb-3">
+                  <span className="text-xs text-muted">OHLC range (all rows):</span>
+                  <PriceRangePicker value={bulkPriceRange} onChange={setBulkPriceRange} />
+                </div>
+                {tradeAiBulk.views.map((row) => {
+                  const symKey = String(row.symbol || "").toUpperCase();
+                  const ph = bulkPriceBySymbol[symKey];
+                  return (
                   <div
                     key={row.symbol}
                     className="rounded-xl border border-surface-border bg-surface/35 px-4 py-4"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <button
                         type="button"
                         onClick={() => setSelected(row.symbol)}
@@ -492,19 +854,20 @@ export default function App() {
                       >
                         {row.symbol}
                       </button>
-                      <span className="text-xs text-muted">
-                        Score {row.score} · Last ${row.quote?.last}{" "}
-                        {row.quote?.changePct != null && (
-                          <span
-                            className={
-                              row.quote.changePct >= 0 ? "text-emerald-300/90" : "text-rose-300/90"
-                            }
-                          >
-                            ({row.quote.changePct >= 0 ? "+" : ""}
-                            {row.quote.changePct}%)
-                          </span>
-                        )}
+                      <span className="font-mono text-base text-slate-100">
+                        ${fmtPrice(row.quote?.last)}
                       </span>
+                      {row.quote?.changePct != null && (
+                        <span
+                          className={`text-sm ${
+                            row.quote.changePct >= 0 ? "text-emerald-300/90" : "text-rose-300/90"
+                          }`}
+                        >
+                          ({row.quote.changePct >= 0 ? "+" : ""}
+                          {row.quote.changePct}%)
+                        </span>
+                      )}
+                      <span className="ml-auto text-xs text-muted">Score {row.score}</span>
                     </div>
                     {row.ruleTargets && (
                       <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
@@ -523,6 +886,34 @@ export default function App() {
                         </div>
                       </dl>
                     )}
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                          Close price ({bulkPriceRange})
+                        </p>
+                        <PriceHistoryChart
+                          rows={ph?.candles}
+                          loading={!ph || ph.loading}
+                          error={ph?.error}
+                          needsSchwab={!!ph?.needsSchwab}
+                          range={bulkPriceRange}
+                          compact
+                        />
+                      </div>
+                      <div>
+                        <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                          OHLC table
+                        </p>
+                        <PriceHistoryTable
+                          rows={ph?.candles}
+                          loading={!ph || ph.loading}
+                          error={ph?.error}
+                          needsSchwab={!!ph?.needsSchwab}
+                          range={bulkPriceRange}
+                          compact
+                        />
+                      </div>
+                    </div>
                     {row.claude && (
                       <div className="mt-3 border-t border-surface-border pt-3 text-sm">
                         <span className="text-xs font-semibold uppercase text-violet-300/90">Claude</span>
@@ -580,7 +971,8 @@ export default function App() {
                       <p className="mt-2 text-xs text-amber-200/85">OpenAI: {row.openaiError}</p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             </div>
@@ -1574,8 +1966,15 @@ export default function App() {
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-surface-border bg-surface-card/80 p-5 shadow-xl shadow-black/40">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">{selected || "—"}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h2 className="text-lg font-semibold">{selected || "—"}</h2>
+                {(tradeAiView?.quote?.last != null || analysis?.analysis?.price != null) && (
+                  <span className="font-mono text-slate-100">
+                    ${fmtPrice(tradeAiView?.quote?.last ?? analysis?.analysis?.price)}
+                  </span>
+                )}
+              </div>
               {analysis?.analysis?.changePct != null && (
                 <Badge tone={analysis.analysis.changePct >= 0 ? "up" : "down"}>
                   {analysis.analysis.changePct >= 0 ? "+" : ""}
@@ -1689,6 +2088,38 @@ export default function App() {
                 </div>
               </dl>
             )}
+            <div className="mt-3 border-t border-surface-border pt-3">
+              <p className="text-xs font-semibold text-slate-300">Schwab price history</p>
+              <div className="mt-2">
+                <PriceRangePicker value={sidebarPriceRange} onChange={setSidebarPriceRange} />
+              </div>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted">
+                    Close price ({sidebarPriceRange})
+                  </p>
+                  <PriceHistoryChart
+                    rows={sidebarPriceHistory.candles}
+                    loading={sidebarPriceHistory.loading}
+                    error={sidebarPriceHistory.error}
+                    needsSchwab={sidebarPriceHistory.needsSchwab}
+                    range={sidebarPriceRange}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted">
+                    OHLC table
+                  </p>
+                  <PriceHistoryTable
+                    rows={sidebarPriceHistory.candles}
+                    loading={sidebarPriceHistory.loading}
+                    error={sidebarPriceHistory.error}
+                    needsSchwab={sidebarPriceHistory.needsSchwab}
+                    range={sidebarPriceRange}
+                  />
+                </div>
+              </div>
+            </div>
             {tradeAiView?.claude && (
               <div className="mt-3 border-t border-surface-border pt-3">
                 <p className="text-xs font-semibold uppercase text-violet-300/90">Claude</p>

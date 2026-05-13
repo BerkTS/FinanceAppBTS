@@ -9,6 +9,10 @@ import { generateInsightOpenAI } from "../services/openai-insight.js";
 import { schwabGet } from "../services/schwab.js";
 import { getSchwabTokenForSession } from "./schwab.js";
 import { generateTradeAiViewSymbol } from "../services/trade-ai-view.js";
+import {
+  normalizePriceHistoryCandles,
+  schwabPriceHistoryParams,
+} from "../services/schwab-price-history.js";
 
 export const stocksRouter = Router();
 
@@ -30,6 +34,58 @@ stocksRouter.get("/trade-ai-view/:symbol", async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+/** OHLC history for charts/tables; must stay before `/:symbol/analysis`. */
+stocksRouter.get("/:symbol/price-history", async (req, res) => {
+  try {
+    const symbol = req.params.symbol.toUpperCase();
+    const sessionId = (req.query.sessionId || "default").toString();
+    const rangeRaw = (req.query.range || "1M").toString();
+    const params = schwabPriceHistoryParams(rangeRaw);
+    const range = String(rangeRaw).toUpperCase();
+
+    const sess = getSchwabTokenForSession(sessionId);
+    const accessToken = sess?.access_token;
+    if (!accessToken) {
+      return res.json({
+        symbol,
+        range,
+        candles: [],
+        needsSchwab: true,
+      });
+    }
+
+    const qs = new URLSearchParams({
+      symbol,
+      periodType: params.periodType,
+      period: String(params.period),
+      frequencyType: params.frequencyType,
+      frequency: String(params.frequency),
+    });
+    if (params.needExtendedHours) {
+      qs.set("needExtendedHoursData", "true");
+    }
+
+    const history = await schwabGet(
+      `/marketdata/v1/pricehistory?${qs.toString()}`,
+      accessToken
+    );
+    const candles = normalizePriceHistoryCandles(history);
+    res.json({
+      symbol,
+      range,
+      candles,
+      empty: candles.length === 0,
+    });
+  } catch (e) {
+    res.status(200).json({
+      symbol: req.params.symbol?.toUpperCase() || "",
+      range: String(req.query.range || "1M").toUpperCase(),
+      candles: [],
+      error: String(e.message || e),
+    });
   }
 });
 
