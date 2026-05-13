@@ -1131,6 +1131,7 @@ export default function App() {
               tradeSuggest &&
               !tradeSuggest.needsSchwab &&
               !tradeSuggest.noQuotes &&
+              !tradeSuggest.error &&
               (!tradeSuggest.suggestions || tradeSuggest.suggestions.length === 0) &&
               !tradeSuggestErr && (
                 <p className="mt-3 text-xl text-muted">No suggestions after filtering quotes.</p>
