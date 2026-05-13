@@ -29,7 +29,12 @@ async function fetchJson(url, rapidApiKey, host, maxRetries = 2) {
       return null;
     }
     if (!res.ok) {
-      throw new Error(`Seeking Alpha ${res.status}: ${lastText.slice(0, 280)}`);
+      if (res.status === 500) {
+        throw new Error(
+          "HTTP 500 — Seeking Alpha upstream error (RapidAPI / provider). Try later, check your plan on RapidAPI, or set SEEKING_ALPHA_DISABLED=1 in .env."
+        );
+      }
+      throw new Error(`Seeking Alpha ${res.status}: ${lastText.slice(0, 200)}`);
     }
     if (!lastText?.trim()) return null;
     try {

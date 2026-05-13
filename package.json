@@ -5,7 +5,7 @@
   "description": "Finance intelligence prototype: news → discovery → analysis → dashboard",
   "scripts": {
     "dev:clean": "sh -c 'for p in 8787 5173 5174; do lsof -ti tcp:$p 2>/dev/null | xargs kill -9 2>/dev/null; done; true'",
-    "dev": "concurrently -k -n server,client -c blue,green \"npm run dev -w server\" \"wait-on -t 120000 http-get://127.0.0.1:8787/api/health && npm run dev -w client\"",
+    "dev": "concurrently -k -n server,client -c blue,green \"npm run dev -w server\" \"NODE_TLS_REJECT_UNAUTHORIZED=0 wait-on -t 120000 --httpTimeout 10000 https-get://127.0.0.1:8787/api/health && npm run dev -w client\"",
     "build": "npm run build -w client",
     "start": "npm run start -w server"
   },

@@ -78,6 +78,7 @@ export default function App() {
   const [tradeAiView, setTradeAiView] = useState(null);
   const [tradeAiViewLoading, setTradeAiViewLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [schwabConnected, setSchwabConnected] = useState(false);
   const historyCaptureRef = useRef(null);
   const [sessionId] = useState(() => localStorage.getItem("schwabSession") || "default");
 
@@ -106,7 +107,11 @@ export default function App() {
 
   useEffect(() => {
     loadDiscover();
-  }, [loadDiscover]);
+    fetch(`${API}/auth/schwab/session?sessionId=${encodeURIComponent(sessionId)}`)
+      .then((r) => r.json())
+      .then((s) => { if (s.connected) setSchwabConnected(true); })
+      .catch(() => {});
+  }, [loadDiscover, sessionId]);
 
   useEffect(() => {
     if (!discover) return undefined;
@@ -355,7 +360,21 @@ export default function App() {
     const res = await fetch(`${API}/auth/schwab/login?state=${encodeURIComponent(sessionId)}`);
     const data = await res.json();
     if (data.authorizeUrl) {
-      window.open(data.authorizeUrl, "schwab_oauth", "width=600,height=720");
+      const popup = window.open(data.authorizeUrl, "schwab_oauth", "width=600,height=720");
+      if (!popup) return;
+      const poll = setInterval(async () => {
+        if (popup.closed) {
+          clearInterval(poll);
+          try {
+            const check = await fetch(`${API}/auth/schwab/session?sessionId=${encodeURIComponent(sessionId)}`);
+            const s = await check.json();
+            if (s.connected) {
+              setSchwabConnected(true);
+              loadDiscover();
+            }
+          } catch {}
+        }
+      }, 800);
     }
   };
 
@@ -390,9 +409,14 @@ export default function App() {
             <button
               type="button"
               onClick={openSchwabLogin}
-              className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-900/30 transition hover:bg-accent-dim"
+              disabled={schwabConnected}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold shadow-lg transition ${
+                schwabConnected
+                  ? "border border-emerald-500/50 bg-emerald-900/40 text-emerald-300 shadow-emerald-900/20 cursor-default"
+                  : "bg-accent text-white shadow-blue-900/30 hover:bg-accent-dim"
+              }`}
             >
-              Connect Schwab
+              {schwabConnected ? "✓ Schwab Connected" : "Connect Schwab"}
             </button>
           </div>
         </div>
@@ -1129,69 +1153,6 @@ export default function App() {
           <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-base font-semibold tracking-tight text-slate-50">
-                CNBC
-              </h3>
-              <span className="text-xs text-muted">
-                RapidAPI · cnbc-markets-and-news-data.p.rapidapi.com
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-muted">
-              Headlines from the CNBC Markets &amp; News Data API — same root{" "}
-              <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> after you subscribe on
-              RapidAPI.
-            </p>
-            {discover?.news?.errors?.find(
-              (e) => e.source === "cnbc_markets_news_api"
-            ) && (
-              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                CNBC API:{" "}
-                {
-                  discover.news.errors.find(
-                    (e) => e.source === "cnbc_markets_news_api"
-                  )?.error
-                }
-              </p>
-            )}
-            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
-              {(discover?.cnbcMarketsNews || []).length === 0 && !loading && (
-                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
-                  No CNBC headlines yet. Set root <span className="font-mono text-slate-400">.env</span>{" "}
-                  <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>, subscribe to{" "}
-                  <strong className="font-medium text-slate-300">CNBC Markets and News Data</strong>{" "}
-                  on RapidAPI, restart <span className="font-mono text-slate-400">npm run dev</span>,
-                  then Refresh.
-                </li>
-              )}
-              {(discover?.cnbcMarketsNews || []).map((n) => (
-                <li
-                  key={n.id}
-                  className="border-b border-surface-border pb-3 last:border-0"
-                >
-                  <a
-                    href={n.url || "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-blue-200 hover:underline"
-                  >
-                    {n.title}
-                  </a>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-                    <span>{n.source}</span>
-                    {n.cnbcCategory && (
-                      <Badge tone="neutral">{n.cnbcCategory}</Badge>
-                    )}
-                    {n.timeLabel && (
-                      <span className="text-slate-500">{n.timeLabel}</span>
-                    )}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold tracking-tight text-slate-50">
                 Real-time finance data
               </h3>
               <span className="text-xs text-muted">
@@ -1260,6 +1221,142 @@ export default function App() {
                           minute: "2-digit",
                         })}
                       </time>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+                Yahoo Finance
+              </h3>
+              <span className="text-xs text-muted">
+                RapidAPI · YH Finance · /v1/markets/news + ticker (see .env.example)
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              Market headlines — use{" "}
+              <span className="font-mono text-slate-400">YH_FINANCE_REQUEST_URL</span> (full URL from
+              RapidAPI Code snippets) or defaults:{" "}
+              <span className="font-mono text-slate-400">/v1/markets/news</span> with{" "}
+              <span className="font-mono text-slate-400">YH_FINANCE_NEWS_TICKERS</span>. Same{" "}
+              <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> or{" "}
+              <span className="font-mono text-slate-400">YH_FINANCE_RAPIDAPI_KEY</span>.
+            </p>
+            {discover?.news?.errors?.find((e) => e.source === "yahoo_finance_api") && (
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                Yahoo Finance API:{" "}
+                {
+                  discover.news.errors.find((e) => e.source === "yahoo_finance_api")
+                    ?.error
+                }
+              </p>
+            )}
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+              {(discover?.yahooFinanceNews || []).length === 0 && !loading && (
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                  No Yahoo Finance headlines yet. Set <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>{" "}
+                  in root <span className="font-mono text-slate-400">.env</span>, subscribe to{" "}
+                  <strong className="font-medium text-slate-300">YH Finance</strong> on RapidAPI,
+                  restart <span className="font-mono text-slate-400">npm run dev</span>, then Refresh.
+                </li>
+              )}
+              {(discover?.yahooFinanceNews || []).map((n) => (
+                <li
+                  key={n.id}
+                  className="border-b border-surface-border pb-3 last:border-0"
+                >
+                  <a
+                    href={n.url || "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-blue-200 hover:underline"
+                  >
+                    {n.title}
+                  </a>
+                  {n.description && (
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                      {(n.description || "").slice(0, 280)}
+                      {(n.description || "").length > 280 ? "…" : ""}
+                    </p>
+                  )}
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                    <span>{n.source}</span>
+                    {n.publishedAt && (
+                      <time className="text-slate-500" dateTime={n.publishedAt}>
+                        {new Date(n.publishedAt).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-5 shadow-lg shadow-black/40">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-base font-semibold tracking-tight text-slate-50">
+                CNBC
+              </h3>
+              <span className="text-xs text-muted">
+                RapidAPI · cnbc-markets-and-news-data.p.rapidapi.com
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              Headlines from the CNBC Markets &amp; News Data API — same root{" "}
+              <span className="font-mono text-slate-400">RAPIDAPI_KEY</span> after you subscribe on
+              RapidAPI.
+            </p>
+            {discover?.news?.errors?.find(
+              (e) => e.source === "cnbc_markets_news_api"
+            ) && (
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                CNBC API:{" "}
+                {
+                  discover.news.errors.find(
+                    (e) => e.source === "cnbc_markets_news_api"
+                  )?.error
+                }
+              </p>
+            )}
+            <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1 text-sm">
+              {(discover?.cnbcMarketsNews || []).length === 0 && !loading && (
+                <li className="rounded-lg border border-dashed border-surface-border bg-surface/40 px-3 py-4 text-sm text-muted">
+                  No CNBC headlines yet. Set root <span className="font-mono text-slate-400">.env</span>{" "}
+                  <span className="font-mono text-slate-400">RAPIDAPI_KEY</span>, subscribe to{" "}
+                  <strong className="font-medium text-slate-300">CNBC Markets and News Data</strong>{" "}
+                  on RapidAPI, restart <span className="font-mono text-slate-400">npm run dev</span>,
+                  then Refresh.
+                </li>
+              )}
+              {(discover?.cnbcMarketsNews || []).map((n) => (
+                <li
+                  key={n.id}
+                  className="border-b border-surface-border pb-3 last:border-0"
+                >
+                  <a
+                    href={n.url || "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-blue-200 hover:underline"
+                  >
+                    {n.title}
+                  </a>
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                    <span>{n.source}</span>
+                    {n.cnbcCategory && (
+                      <Badge tone="neutral">{n.cnbcCategory}</Badge>
+                    )}
+                    {n.timeLabel && (
+                      <span className="text-slate-500">{n.timeLabel}</span>
                     )}
                   </p>
                 </li>

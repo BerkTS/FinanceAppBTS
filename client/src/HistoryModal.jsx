@@ -138,8 +138,9 @@ function RenderNewsBlock({ payload }) {
   if (!payload) return <p className="text-xs text-muted">No news payload</p>;
   const blocks = [
     ["Seeking Alpha", payload.seekingAlpha],
-    ["CNBC", payload.cnbcMarketsNews],
     ["Real-time finance", payload.realtimeFinanceNews],
+    ["Yahoo Finance", payload.yahooFinanceNews],
+    ["CNBC", payload.cnbcMarketsNews],
     ["Reuters", payload.reutersBusinessNews],
     ["Real-time News Data", payload.realTimeNewsData],
   ];

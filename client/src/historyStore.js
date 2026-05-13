@@ -105,8 +105,9 @@ function trimNewsSectionPayload(discover) {
         }
       : null,
     seekingAlpha: cloneJSON(capArray(discover.seekingAlpha, n)),
-    cnbcMarketsNews: cloneJSON(capArray(discover.cnbcMarketsNews, n)),
     realtimeFinanceNews: cloneJSON(capArray(discover.realtimeFinanceNews, n)),
+    yahooFinanceNews: cloneJSON(capArray(discover.yahooFinanceNews, n)),
+    cnbcMarketsNews: cloneJSON(capArray(discover.cnbcMarketsNews, n)),
     reutersBusinessNews: cloneJSON(capArray(discover.reutersBusinessNews, n)),
     realTimeNewsData: cloneJSON(capArray(discover.realTimeNewsData, n)),
   };

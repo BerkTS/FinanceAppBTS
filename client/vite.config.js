@@ -1,11 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const apiTarget = "http://127.0.0.1:8787";
+const apiTarget = "https://127.0.0.1:8787";
 
 const apiProxy = {
   target: apiTarget,
   changeOrigin: true,
+  secure: false,
   /** News aggregation can take >30s (GDELT spacing + upstream latency). */
   timeout: 180_000,
   proxyTimeout: 180_000,

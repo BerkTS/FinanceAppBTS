@@ -50,12 +50,31 @@ export function buildResearchCorpus(payload, env = process.env) {
   const rtCap = Number(env.CORPUS_REALTIME_NEWS_CAP) || 12;
   const finCap = Number(env.CORPUS_REALTIME_FINANCE_CAP) || 12;
 
+  const yahooCap = Number(env.CORPUS_YAHOO_FINANCE_CAP) || 14;
+
   const chunks = [];
 
   const fromMain = (payload._rawArticles || []).map((a) =>
     asArticle(a, a.provider || a.outlet || "main")
   );
   takeCap(fromMain, mainCap).forEach((a) => chunks.push(a));
+
+  takeCap(
+    (payload.seekingAlpha || []).map((x) => asArticle(x, "seeking_alpha")),
+    saCap
+  ).forEach((a) => chunks.push(a));
+
+  takeCap(
+    (payload.realtimeFinanceNews || []).map((x) =>
+      asArticle(x, "realtime_finance")
+    ),
+    finCap
+  ).forEach((a) => chunks.push(a));
+
+  takeCap(
+    (payload.yahooFinanceNews || []).map((x) => asArticle(x, "yahoo_finance")),
+    yahooCap
+  ).forEach((a) => chunks.push(a));
 
   takeCap(
     (payload.cnbcMarketsNews || []).map((x) => asArticle(x, "cnbc")),
@@ -68,20 +87,8 @@ export function buildResearchCorpus(payload, env = process.env) {
   ).forEach((a) => chunks.push(a));
 
   takeCap(
-    (payload.seekingAlpha || []).map((x) => asArticle(x, "seeking_alpha")),
-    saCap
-  ).forEach((a) => chunks.push(a));
-
-  takeCap(
     (payload.realTimeNewsData || []).map((x) => asArticle(x, "realtime_news_data")),
     rtCap
-  ).forEach((a) => chunks.push(a));
-
-  takeCap(
-    (payload.realtimeFinanceNews || []).map((x) =>
-      asArticle(x, "realtime_finance")
-    ),
-    finCap
   ).forEach((a) => chunks.push(a));
 
   const deduped = dedupeByContentKey(chunks);

@@ -1,14 +1,17 @@
 import fs from "fs";
 import http from "http";
+import https from "https";
 import path from "path";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { newsRouter } from "./routes/news.js";
-import { schwabRouter } from "./routes/schwab.js";
+import { schwabRouter, getSchwabTokenForSession } from "./routes/schwab.js";
 import { discoverRouter } from "./routes/discover.js";
 import { stocksRouter } from "./routes/stocks.js";
+import { historyRouter } from "./routes/history.js";
+import { startServerScheduler } from "./services/server-scheduler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** npm -w server runs with cwd=server/, so default dotenv misses repo-root .env */
@@ -42,6 +45,7 @@ app.use("/api/news", newsRouter);
 app.use("/api/auth/schwab", schwabRouter);
 app.use("/api/discover", discoverRouter);
 app.use("/api/stocks", stocksRouter);
+app.use("/api/history", historyRouter);
 
 const hasBuiltClient =
   fs.existsSync(path.join(clientDist, "index.html")) &&
@@ -58,7 +62,22 @@ if (hasBuiltClient) {
   });
 }
 
-const server = http.createServer(app);
+const certDir = path.resolve(__dirname, "../certs");
+const hasCerts =
+  fs.existsSync(path.join(certDir, "key.pem")) &&
+  fs.existsSync(path.join(certDir, "cert.pem"));
+
+const server = hasCerts
+  ? https.createServer(
+      {
+        key: fs.readFileSync(path.join(certDir, "key.pem")),
+        cert: fs.readFileSync(path.join(certDir, "cert.pem")),
+      },
+      app
+    )
+  : http.createServer(app);
+
+const proto = hasCerts ? "https" : "http";
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
@@ -75,7 +94,8 @@ server.on("error", (err) => {
 
 server.listen(PORT, () => {
   const where = hasBuiltClient
-    ? `http://127.0.0.1:${PORT} (API + built UI — or use Vite on 5173 during dev)`
-    : `http://127.0.0.1:${PORT} (API only — open Vite at http://localhost:5173, or run npm run build then npm start)`;
+    ? `${proto}://127.0.0.1:${PORT} (API + built UI — or use Vite on 5173 during dev)`
+    : `${proto}://127.0.0.1:${PORT} (API only — open Vite at http://localhost:5173, or run npm run build then npm start)`;
   console.log(`API listening on ${where}`);
+  startServerScheduler(getSchwabTokenForSession, process.env);
 });
