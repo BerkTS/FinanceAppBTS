@@ -311,9 +311,50 @@ export default function App() {
   const [bulkPriceRange, setBulkPriceRange] = useState("1M");
   const [bulkPriceBySymbol, setBulkPriceBySymbol] = useState({});
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [saPicks, setSaPicks] = useState(null);
+  const [saAnalyzing, setSaAnalyzing] = useState(false);
+  const [saErr, setSaErr] = useState(null);
+  const [saRunState, setSaRunState] = useState(null);
   const [schwabConnected, setSchwabConnected] = useState(false);
   const historyCaptureRef = useRef(null);
   const [sessionId] = useState(() => localStorage.getItem("schwabSession") || "default");
+
+  const refreshSeekingAlphaBrowserStatus = useCallback(async () => {
+    try {
+      const data = await fetchJson("/seeking-alpha/status");
+      setSaRunState(data.runState || null);
+      if (data.latest) setSaPicks(data.latest);
+      setSaAnalyzing(!!data.running);
+      return data;
+    } catch (e) {
+      setSaErr(String(e.message || e));
+      return null;
+    }
+  }, []);
+
+  const runSeekingAlphaBrowserAnalysis = useCallback(async () => {
+    setSaErr(null);
+    try {
+      const res = await fetch(`${API}/seeking-alpha/analyze`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSaAnalyzing(true);
+    } catch (e) {
+      setSaErr(String(e.message || e));
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshSeekingAlphaBrowserStatus();
+  }, [refreshSeekingAlphaBrowserStatus]);
+
+  useEffect(() => {
+    if (!saAnalyzing) return undefined;
+    const id = setInterval(() => {
+      refreshSeekingAlphaBrowserStatus();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [saAnalyzing, refreshSeekingAlphaBrowserStatus]);
 
   const loadDiscover = useCallback(async () => {
     setLoading(true);
@@ -1549,6 +1590,115 @@ export default function App() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="rounded-2xl border border-teal-500/35 bg-teal-950/20 p-6 shadow-lg shadow-black/40 ring-1 ring-teal-500/15">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-2xl font-semibold tracking-tight text-teal-50">
+                  Seeking Alpha · Claude browser picks
+                </h3>
+                <p className="mt-1 text-lg text-muted">
+                  Opens Seeking Alpha in a saved browser profile (your Premium login), captures pages,
+                  and uses Claude to choose top 5 ideas for the session. Scheduled{" "}
+                  <span className="text-slate-300">8:30 AM ET</span> on NYSE weekdays.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={runSeekingAlphaBrowserAnalysis}
+                disabled={saAnalyzing}
+                className={`rounded-lg px-4 py-2.5 text-xl font-semibold shadow-lg transition ${
+                  saAnalyzing
+                    ? "cursor-wait border border-teal-500/40 bg-teal-900/50 text-teal-200/80"
+                    : "bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30"
+                }`}
+              >
+                {saAnalyzing ? "Analyzing…" : "Analyze Seeking Alpha"}
+              </button>
+            </div>
+            {saErr && (
+              <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xl text-rose-100">
+                {saErr}
+              </p>
+            )}
+            {saRunState?.lastError && !saAnalyzing && (
+              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xl text-amber-100">
+                Last run error: {saRunState.lastError}
+              </p>
+            )}
+            {saPicks?.loginRequired && saPicks?.hint && (
+              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xl text-amber-100">
+                {saPicks.hint}
+              </p>
+            )}
+            {saPicks?.disclaimer && (
+              <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-lg leading-relaxed text-amber-100/90">
+                {saPicks.disclaimer}
+              </p>
+            )}
+            {saPicks?.marketContext && (
+              <p className="mt-3 text-xl leading-relaxed text-slate-300">{saPicks.marketContext}</p>
+            )}
+            {saPicks?.generatedAt && (
+              <p className="mt-2 text-lg text-slate-500">
+                Last run: {new Date(saPicks.generatedAt).toLocaleString()} ·{" "}
+                {saPicks.trigger === "scheduled" ? "scheduled (pre-open)" : "manual"}
+              </p>
+            )}
+            {Array.isArray(saPicks?.picks) && saPicks.picks.length > 0 ? (
+              <ol className="mt-5 space-y-4">
+                {saPicks.picks.map((p) => (
+                  <li
+                    key={`${p.rank}-${p.symbol}`}
+                    className="rounded-xl border border-surface-border bg-black/25 px-4 py-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-2xl font-bold text-teal-200">
+                        #{p.rank} {p.symbol}
+                      </span>
+                      <Badge
+                        tone={
+                          p.conviction === "high"
+                            ? "up"
+                            : p.conviction === "low"
+                              ? "down"
+                              : "neutral"
+                        }
+                      >
+                        {p.conviction} conviction
+                      </Badge>
+                      {p.saUrl && (
+                        <a
+                          href={p.saUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-lg text-blue-200 hover:underline"
+                        >
+                          On Seeking Alpha
+                        </a>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xl leading-relaxed text-slate-200">{p.thesis}</p>
+                    {p.risks && (
+                      <p className="mt-2 text-xl text-rose-200/85">Risks: {p.risks}</p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              !saAnalyzing &&
+              !saPicks?.loginRequired && (
+                <p className="mt-4 text-xl text-muted">
+                  No browser picks saved yet. Install Playwright once (
+                  <span className="font-mono text-slate-400">npx playwright install chromium</span>
+                  ), set <span className="font-mono text-slate-400">ANTHROPIC_API_KEY</span>, log in to
+                  Seeking Alpha with{" "}
+                  <span className="font-mono text-slate-400">SEEKING_ALPHA_HEADLESS=0</span> on first
+                  run, then click Analyze.
+                </p>
+              )
+            )}
           </div>
 
           <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">

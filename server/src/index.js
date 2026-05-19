@@ -11,7 +11,9 @@ import { schwabRouter, getSchwabTokenForSession } from "./routes/schwab.js";
 import { discoverRouter } from "./routes/discover.js";
 import { stocksRouter } from "./routes/stocks.js";
 import { historyRouter } from "./routes/history.js";
+import { seekingAlphaRouter } from "./routes/seeking-alpha.js";
 import { startServerScheduler } from "./services/server-scheduler.js";
+import { startSeekingAlphaScheduler } from "./services/seeking-alpha-scheduler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** npm -w server runs with cwd=server/, so default dotenv misses repo-root .env */
@@ -37,6 +39,7 @@ app.get("/api/health", (_req, res) => {
       newsApiKeyLoaded: Boolean(process.env.NEWS_API_KEY),
       anthropicKeyLoaded: Boolean(process.env.ANTHROPIC_API_KEY),
       openaiKeyLoaded: Boolean(process.env.OPENAI_API_KEY),
+      seekingAlphaBrowserEnabled: process.env.SEEKING_ALPHA_BROWSER_DISABLED !== "1",
     },
   });
 });
@@ -46,6 +49,7 @@ app.use("/api/auth/schwab", schwabRouter);
 app.use("/api/discover", discoverRouter);
 app.use("/api/stocks", stocksRouter);
 app.use("/api/history", historyRouter);
+app.use("/api/seeking-alpha", seekingAlphaRouter);
 
 const hasBuiltClient =
   fs.existsSync(path.join(clientDist, "index.html")) &&
@@ -98,4 +102,5 @@ server.listen(PORT, () => {
     : `${proto}://127.0.0.1:${PORT} (API only — open Vite at http://localhost:5173, or run npm run build then npm start)`;
   console.log(`API listening on ${where}`);
   startServerScheduler(getSchwabTokenForSession, process.env);
+  startSeekingAlphaScheduler(process.env);
 });
