@@ -315,6 +315,10 @@ export default function App() {
   const [saAnalyzing, setSaAnalyzing] = useState(false);
   const [saErr, setSaErr] = useState(null);
   const [saRunState, setSaRunState] = useState(null);
+  /** Per-symbol OHLC range for Seeking Alpha Claude picks (Schwab chart/table). */
+  const [saPickRangeBySymbol, setSaPickRangeBySymbol] = useState({});
+  const [saPickPriceBySymbol, setSaPickPriceBySymbol] = useState({});
+  const saPickRangePrevRef = useRef({});
   const [schwabConnected, setSchwabConnected] = useState(false);
   const historyCaptureRef = useRef(null);
   const [sessionId] = useState(() => localStorage.getItem("schwabSession") || "default");
@@ -335,26 +339,144 @@ export default function App() {
   const runSeekingAlphaBrowserAnalysis = useCallback(async () => {
     setSaErr(null);
     try {
-      const res = await fetch(`${API}/seeking-alpha/analyze`, { method: "POST" });
+      const res = await fetch(`${API}/seeking-alpha/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setSaAnalyzing(true);
     } catch (e) {
       setSaErr(String(e.message || e));
     }
-  }, []);
+  }, [sessionId]);
 
   useEffect(() => {
     refreshSeekingAlphaBrowserStatus();
   }, [refreshSeekingAlphaBrowserStatus]);
 
   useEffect(() => {
-    if (!saAnalyzing) return undefined;
     const id = setInterval(() => {
       refreshSeekingAlphaBrowserStatus();
     }, 4000);
     return () => clearInterval(id);
   }, [saAnalyzing, refreshSeekingAlphaBrowserStatus]);
+
+  const saPickSymbols = useMemo(() => {
+    const picks = saPicks?.picks;
+    if (!Array.isArray(picks)) return [];
+    return [...new Set(picks.map((p) => String(p.symbol || "").toUpperCase()).filter(Boolean))];
+  }, [saPicks?.picks]);
+
+  useEffect(() => {
+    const keep = new Set(saPickSymbols);
+    setSaPickRangeBySymbol((prev) => {
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!keep.has(k)) delete next[k];
+      }
+      return next;
+    });
+    setSaPickPriceBySymbol((prev) => {
+      const next = { ...prev };
+      for (const k of Object.keys(next)) {
+        if (!keep.has(k)) delete next[k];
+      }
+      return next;
+    });
+    for (const k of Object.keys(saPickRangePrevRef.current)) {
+      if (!keep.has(k)) delete saPickRangePrevRef.current[k];
+    }
+  }, [saPickSymbols]);
+
+  /** OHLC charts only — quotes/levels come from pick.schwabTradeView (saved at Analyze time). */
+  useEffect(() => {
+    if (saPickSymbols.length === 0) {
+      setSaPickPriceBySymbol({});
+      saPickRangePrevRef.current = {};
+      return undefined;
+    }
+    const symbolsToFetch = saPickSymbols.filter((sym) => {
+      const range = saPickRangeBySymbol[sym] || "1M";
+      return saPickRangePrevRef.current[sym] !== range;
+    });
+    for (const sym of saPickSymbols) {
+      saPickRangePrevRef.current[sym] = saPickRangeBySymbol[sym] || "1M";
+    }
+    if (symbolsToFetch.length === 0) return undefined;
+
+    let cancelled = false;
+    setSaPickPriceBySymbol((prev) => {
+      const next = { ...prev };
+      for (const sym of symbolsToFetch) {
+        const range = saPickRangeBySymbol[sym] || "1M";
+        const prevRow = prev[sym];
+        next[sym] = {
+          candles: prevRow?.range === range ? prevRow.candles || [] : [],
+          loading: true,
+          error: null,
+          needsSchwab: false,
+          range,
+        };
+      }
+      return next;
+    });
+
+    (async () => {
+      await Promise.all(
+        symbolsToFetch.map(async (sym) => {
+          const range = saPickRangeBySymbol[sym] || "1M";
+          try {
+            const res = await fetch(
+              `${API}/stocks/${encodeURIComponent(sym)}/price-history?sessionId=${encodeURIComponent(sessionId)}&range=${encodeURIComponent(range)}`
+            );
+            const data = await res.json().catch(() => ({}));
+            if (cancelled) return;
+            if (!res.ok) {
+              setSaPickPriceBySymbol((prev) => ({
+                ...prev,
+                [sym]: {
+                  candles: [],
+                  loading: false,
+                  error: data.error || `HTTP ${res.status}`,
+                  needsSchwab: false,
+                  range,
+                },
+              }));
+              return;
+            }
+            setSaPickPriceBySymbol((prev) => ({
+              ...prev,
+              [sym]: {
+                candles: data.candles || [],
+                loading: false,
+                error: data.error || null,
+                needsSchwab: !!data.needsSchwab,
+                range,
+              },
+            }));
+          } catch (e) {
+            if (!cancelled) {
+              setSaPickPriceBySymbol((prev) => ({
+                ...prev,
+                [sym]: {
+                  candles: [],
+                  loading: false,
+                  error: String(e.message || e),
+                  needsSchwab: false,
+                  range,
+                },
+              }));
+            }
+          }
+        })
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [saPickSymbols, saPickRangeBySymbol, sessionId]);
 
   const loadDiscover = useCallback(async () => {
     setLoading(true);
@@ -830,6 +952,304 @@ export default function App() {
 
       <main className="mx-auto grid max-w-[1440px] gap-8 px-6 py-10 lg:grid-cols-3">
         <section className="lg:col-span-2 space-y-12">
+          <div className="rounded-2xl border border-teal-500/35 bg-teal-950/20 p-6 shadow-lg shadow-black/40 ring-1 ring-teal-500/15">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-2xl font-semibold tracking-tight text-teal-50">
+                  Seeking Alpha · Claude browser picks
+                </h3>
+                <p className="mt-1 text-lg text-muted">
+                  Opens Seeking Alpha in a saved browser profile (your Premium login), captures pages,
+                  and uses Claude to choose top 5 ideas for the session. After picks are saved, each symbol is
+                  run through the same <strong className="text-slate-300">Schwab + Claude structured trade view</strong>{" "}
+                  pipeline as the emerald section (rule-based entry / stop / targets, Claude bias + thesis from
+                  headlines). Scheduled{" "}
+                  <span className="text-slate-300">8:30 AM ET</span> on NYSE weekdays. Buy/sell use
+                  Schwab ask/bid when connected.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={runSeekingAlphaBrowserAnalysis}
+                disabled={saAnalyzing}
+                className={`rounded-lg px-4 py-2.5 text-xl font-semibold shadow-lg transition ${
+                  saAnalyzing
+                    ? "cursor-wait border border-teal-500/40 bg-teal-900/50 text-teal-200/80"
+                    : "bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30"
+                }`}
+              >
+                {saAnalyzing ? "Analyzing…" : "Analyze Seeking Alpha"}
+              </button>
+            </div>
+            {saErr && (
+              <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xl text-rose-100">
+                {saErr}
+              </p>
+            )}
+            {saRunState?.lastError && !saAnalyzing && (
+              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xl text-amber-100">
+                Last run error: {saRunState.lastError}
+              </p>
+            )}
+            {saPicks?.loginRequired && saPicks?.hint && (
+              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xl text-amber-100">
+                {saPicks.hint}
+              </p>
+            )}
+            {saPicks?.disclaimer && (
+              <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-lg leading-relaxed text-amber-100/90">
+                {saPicks.disclaimer}
+              </p>
+            )}
+            {saPicks?.marketContext && (
+              <p className="mt-3 text-xl leading-relaxed text-slate-300">{saPicks.marketContext}</p>
+            )}
+            {saPicks?.generatedAt && (
+              <p className="mt-2 text-lg text-slate-500">
+                Last run: {new Date(saPicks.generatedAt).toLocaleString()} ·{" "}
+                {saPicks.trigger === "scheduled" ? "scheduled (pre-open)" : "manual"}
+              </p>
+            )}
+            {Array.isArray(saPicks?.picks) && saPicks.picks.length > 0 ? (
+              <ol className="mt-5 space-y-8">
+                {saPicks.picks.map((p) => {
+                  const sym = String(p.symbol || "").toUpperCase();
+                  const ph = saPickPriceBySymbol[sym];
+                  const range = saPickRangeBySymbol[sym] || "1M";
+                  const tv = p.schwabTradeView;
+                  const q = tv?.quote;
+                  const rt = tv?.ruleTargets || null;
+                  const scoreVal =
+                    tv?.ok && !tv.needsSchwab && tv.score != null ? tv.score : null;
+                  return (
+                    <li
+                      key={`${p.rank}-${sym}`}
+                      className="rounded-xl border border-surface-border bg-slate-950/50 px-5 py-5 shadow-md ring-1 ring-white/[0.06]"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelected(sym)}
+                          className="font-mono text-xl font-semibold text-teal-200 hover:underline"
+                        >
+                          {sym}
+                        </button>
+                        <span className="font-mono text-xl text-slate-100">
+                          {tv?.needsSchwab
+                            ? "—"
+                            : q?.last != null
+                              ? `$${fmtPrice(q.last)}`
+                              : "—"}
+                        </span>
+                        {!tv?.needsSchwab && q?.changePct != null && (
+                          <span
+                            className={`text-xl ${
+                              q.changePct >= 0 ? "text-emerald-300/90" : "text-rose-300/90"
+                            }`}
+                          >
+                            ({q.changePct >= 0 ? "+" : ""}
+                            {q.changePct}%)
+                          </span>
+                        )}
+                        <Badge
+                          tone={
+                            p.conviction === "high"
+                              ? "up"
+                              : p.conviction === "low"
+                                ? "down"
+                                : "neutral"
+                          }
+                        >
+                          {p.conviction} · #{p.rank}
+                        </Badge>
+                        {p.saUrl && (
+                          <a
+                            href={p.saUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-lg text-blue-200 hover:underline"
+                          >
+                            On Seeking Alpha
+                          </a>
+                        )}
+                        <span className="ml-auto text-lg text-muted">
+                          {scoreVal != null
+                            ? `Score ${scoreVal}`
+                            : tv?.needsSchwab
+                              ? "Score —"
+                              : !tv
+                                ? "Re-run Analyze for levels"
+                                : "Score —"}
+                        </span>
+                      </div>
+                      <dl className="mt-3 grid gap-2 text-xl sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-lg bg-black/20 px-2 py-2">
+                          <dt className="text-muted">Last</dt>
+                          <dd className="font-mono text-slate-100">
+                            {tv?.needsSchwab ? "—" : `$${fmtPrice(q?.last)}`}
+                          </dd>
+                        </div>
+                        <div className="rounded-lg bg-black/20 px-2 py-2">
+                          <dt className="text-muted">Buy (ask)</dt>
+                          <dd className="font-mono text-slate-100">
+                            {tv?.needsSchwab ? "—" : `$${fmtPrice(q?.ask)}`}
+                          </dd>
+                        </div>
+                        <div className="rounded-lg bg-black/20 px-2 py-2">
+                          <dt className="text-muted">Sell (bid)</dt>
+                          <dd className="font-mono text-slate-100">
+                            {tv?.needsSchwab ? "—" : `$${fmtPrice(q?.bid)}`}
+                          </dd>
+                        </div>
+                        <div className="rounded-lg bg-black/20 px-2 py-2">
+                          <dt className="text-muted">Schwab</dt>
+                          <dd className="text-slate-300">
+                            {tv?.needsSchwab && <span>Connect for quotes</span>}
+                            {tv?.error && (
+                              <span className="text-rose-200/90">{tv.error.slice(0, 120)}</span>
+                            )}
+                            {!tv?.needsSchwab && !tv?.error && q?.changePct != null && (
+                              <span
+                                className={
+                                  q.changePct >= 0 ? "text-emerald-300/90" : "text-rose-300/90"
+                                }
+                              >
+                                {q.changePct >= 0 ? "+" : ""}
+                                {q.changePct}%
+                              </span>
+                            )}
+                            {!tv?.needsSchwab && !tv?.error && q?.last == null && (
+                              <span className="text-muted">No quote</span>
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                      {rt && (
+                        <dl className="mt-4 grid gap-3 text-xl sm:grid-cols-2">
+                          <div className="rounded-lg bg-black/20 px-2 py-2">
+                            <dt className="text-muted">Entry zone</dt>
+                            <dd className="font-mono text-slate-200">
+                              ${fmtPrice(rt.entryLow)} – ${fmtPrice(rt.entryHigh)}
+                            </dd>
+                          </div>
+                          <div className="rounded-lg bg-black/20 px-2 py-2">
+                            <dt className="text-muted">Stop / T1 / T2</dt>
+                            <dd className="font-mono text-slate-200">
+                              ${fmtPrice(rt.stop)} · ${fmtPrice(rt.target1)} · ${fmtPrice(rt.target2)}
+                            </dd>
+                          </div>
+                        </dl>
+                      )}
+                      {!rt && tv?.needsSchwab && (
+                        <p className="mt-3 text-lg text-muted">
+                          Connect Schwab, then run <strong className="text-slate-300">Analyze Seeking Alpha</strong>{" "}
+                          again so each pick gets Schwab levels (saved once per run).
+                        </p>
+                      )}
+                      {!rt && !tv && (
+                        <p className="mt-3 text-lg text-muted">
+                          Run <strong className="text-slate-300">Analyze Seeking Alpha</strong> with Schwab
+                          connected to load entry zone and stop / targets.
+                        </p>
+                      )}
+                      {tv?.error && !rt && (
+                        <p className="mt-2 text-lg text-amber-200/85">
+                          Schwab / levels: {String(tv.error).slice(0, 200)}
+                        </p>
+                      )}
+                      {tv?.claude && (
+                        <div className="mt-4 border-t border-surface-border pt-4 text-xl leading-relaxed">
+                          <span className="text-xl font-semibold uppercase tracking-wide text-violet-300/90">
+                            Claude (Schwab + headlines)
+                          </span>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <Badge
+                              tone={
+                                tv.claude.bias === "constructive"
+                                  ? "up"
+                                  : tv.claude.bias === "cautious"
+                                    ? "down"
+                                    : "neutral"
+                              }
+                            >
+                              {tv.claude.bias}
+                            </Badge>
+                            {tv.claude.alignment === "needs_review" && (
+                              <Badge tone="info">Headlines vs setup</Badge>
+                            )}
+                          </div>
+                          <p className="mt-2 text-xl leading-relaxed text-slate-300">{tv.claude.thesis}</p>
+                          {tv.claude.risks && (
+                            <p className="mt-2 text-xl text-rose-200/85">Risks: {tv.claude.risks}</p>
+                          )}
+                        </div>
+                      )}
+                      {tv?.claudeError && (
+                        <p className="mt-2 text-xl text-amber-200/85">Claude (levels view): {tv.claudeError}</p>
+                      )}
+                      <p className="mt-3 text-xl font-semibold uppercase tracking-wide text-teal-400/90">
+                        Seeking Alpha thesis
+                      </p>
+                      <p className="mt-1 text-xl leading-relaxed text-slate-200">{p.thesis}</p>
+                      {p.risks && (
+                        <p className="mt-2 text-xl text-rose-200/85">Risks: {p.risks}</p>
+                      )}
+                      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-teal-500/20 pt-4">
+                        <span className="text-lg font-medium text-slate-400">OHLC range:</span>
+                        <PriceRangePicker
+                          value={range}
+                          onChange={(r) =>
+                            setSaPickRangeBySymbol((prev) => ({ ...prev, [sym]: r }))
+                          }
+                        />
+                      </div>
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <p className="mb-2 text-xl font-semibold uppercase tracking-wide text-slate-400">
+                            Close price ({range})
+                          </p>
+                          <PriceHistoryChart
+                            rows={ph?.candles}
+                            loading={!ph || ph.loading}
+                            error={ph?.error}
+                            needsSchwab={!!ph?.needsSchwab}
+                            range={range}
+                            compact
+                          />
+                        </div>
+                        <div>
+                          <p className="mb-2 text-xl font-semibold uppercase tracking-wide text-slate-400">
+                            OHLC table
+                          </p>
+                          <PriceHistoryTable
+                            rows={ph?.candles}
+                            loading={!ph || ph.loading}
+                            error={ph?.error}
+                            needsSchwab={!!ph?.needsSchwab}
+                            range={range}
+                            compact
+                          />
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              !saAnalyzing &&
+              !saPicks?.loginRequired && (
+                <p className="mt-4 text-xl text-muted">
+                  No browser picks saved yet. Install Playwright once (
+                  <span className="font-mono text-slate-400">npx playwright install chromium</span>
+                  ), set <span className="font-mono text-slate-400">ANTHROPIC_API_KEY</span>, log in to
+                  Seeking Alpha with{" "}
+                  <span className="font-mono text-slate-400">SEEKING_ALPHA_HEADLESS=0</span> on first
+                  run, then click Analyze.
+                </p>
+              )
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-border bg-surface-card/50 px-5 py-4 shadow-sm ring-1 ring-white/[0.04]">
             <h2 className="text-xl font-semibold uppercase tracking-wide text-slate-400">
               Data feeds
@@ -1590,115 +2010,6 @@ export default function App() {
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="rounded-2xl border border-teal-500/35 bg-teal-950/20 p-6 shadow-lg shadow-black/40 ring-1 ring-teal-500/15">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-2xl font-semibold tracking-tight text-teal-50">
-                  Seeking Alpha · Claude browser picks
-                </h3>
-                <p className="mt-1 text-lg text-muted">
-                  Opens Seeking Alpha in a saved browser profile (your Premium login), captures pages,
-                  and uses Claude to choose top 5 ideas for the session. Scheduled{" "}
-                  <span className="text-slate-300">8:30 AM ET</span> on NYSE weekdays.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={runSeekingAlphaBrowserAnalysis}
-                disabled={saAnalyzing}
-                className={`rounded-lg px-4 py-2.5 text-xl font-semibold shadow-lg transition ${
-                  saAnalyzing
-                    ? "cursor-wait border border-teal-500/40 bg-teal-900/50 text-teal-200/80"
-                    : "bg-teal-600 text-white hover:bg-teal-500 shadow-teal-900/30"
-                }`}
-              >
-                {saAnalyzing ? "Analyzing…" : "Analyze Seeking Alpha"}
-              </button>
-            </div>
-            {saErr && (
-              <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xl text-rose-100">
-                {saErr}
-              </p>
-            )}
-            {saRunState?.lastError && !saAnalyzing && (
-              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xl text-amber-100">
-                Last run error: {saRunState.lastError}
-              </p>
-            )}
-            {saPicks?.loginRequired && saPicks?.hint && (
-              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xl text-amber-100">
-                {saPicks.hint}
-              </p>
-            )}
-            {saPicks?.disclaimer && (
-              <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-lg leading-relaxed text-amber-100/90">
-                {saPicks.disclaimer}
-              </p>
-            )}
-            {saPicks?.marketContext && (
-              <p className="mt-3 text-xl leading-relaxed text-slate-300">{saPicks.marketContext}</p>
-            )}
-            {saPicks?.generatedAt && (
-              <p className="mt-2 text-lg text-slate-500">
-                Last run: {new Date(saPicks.generatedAt).toLocaleString()} ·{" "}
-                {saPicks.trigger === "scheduled" ? "scheduled (pre-open)" : "manual"}
-              </p>
-            )}
-            {Array.isArray(saPicks?.picks) && saPicks.picks.length > 0 ? (
-              <ol className="mt-5 space-y-4">
-                {saPicks.picks.map((p) => (
-                  <li
-                    key={`${p.rank}-${p.symbol}`}
-                    className="rounded-xl border border-surface-border bg-black/25 px-4 py-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-2xl font-bold text-teal-200">
-                        #{p.rank} {p.symbol}
-                      </span>
-                      <Badge
-                        tone={
-                          p.conviction === "high"
-                            ? "up"
-                            : p.conviction === "low"
-                              ? "down"
-                              : "neutral"
-                        }
-                      >
-                        {p.conviction} conviction
-                      </Badge>
-                      {p.saUrl && (
-                        <a
-                          href={p.saUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-lg text-blue-200 hover:underline"
-                        >
-                          On Seeking Alpha
-                        </a>
-                      )}
-                    </div>
-                    <p className="mt-2 text-xl leading-relaxed text-slate-200">{p.thesis}</p>
-                    {p.risks && (
-                      <p className="mt-2 text-xl text-rose-200/85">Risks: {p.risks}</p>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              !saAnalyzing &&
-              !saPicks?.loginRequired && (
-                <p className="mt-4 text-xl text-muted">
-                  No browser picks saved yet. Install Playwright once (
-                  <span className="font-mono text-slate-400">npx playwright install chromium</span>
-                  ), set <span className="font-mono text-slate-400">ANTHROPIC_API_KEY</span>, log in to
-                  Seeking Alpha with{" "}
-                  <span className="font-mono text-slate-400">SEEKING_ALPHA_HEADLESS=0</span> on first
-                  run, then click Analyze.
-                </p>
-              )
-            )}
           </div>
 
           <div className="rounded-2xl border border-surface-border bg-surface-card/90 p-6 shadow-lg shadow-black/40 ring-1 ring-black/20">

@@ -2,7 +2,10 @@
  * Live trade *suggestions* (not order execution): Schwab quotes + rule-derived levels + Claude + ChatGPT narration.
  */
 import crypto from "crypto";
-import { schwabGet } from "./schwab.js";
+import {
+  fetchSchwabPriceHistoryCached,
+  fetchSchwabQuotesCached,
+} from "./schwab-market-cache.js";
 import { calculateATR } from "../lib/indicators.js";
 import { fetchDiscoverPayload } from "./discover-payload.js";
 import { parseJsonFromModel } from "./briefing-shared.js";
@@ -137,10 +140,7 @@ export async function generateLiveTradeSuggestions(params) {
   const symParam = universe.map(encodeURIComponent).join("%2C");
   let quoteMap;
   try {
-    const qres = await schwabGet(
-      `/marketdata/v1/quotes?symbols=${symParam}`,
-      accessToken
-    );
+    const { data: qres } = await fetchSchwabQuotesCached(universe, accessToken, env);
     quoteMap = parseBatchQuotes(qres, universe);
   } catch (e) {
     return {
@@ -181,18 +181,19 @@ export async function generateLiveTradeSuggestions(params) {
 
   const enriched = [];
   for (const row of forHistory) {
-    let history;
+    let candles = [];
     try {
-      history = await schwabGet(
-        `/marketdata/v1/pricehistory?symbol=${encodeURIComponent(row.symbol)}&periodType=month&period=3&frequencyType=daily&frequency=1`,
-        accessToken
+      const { candles: cached } = await fetchSchwabPriceHistoryCached(
+        row.symbol,
+        "3M",
+        accessToken,
+        env
       );
+      candles = normalizeCandles({ candles: cached });
     } catch {
-      history = null;
+      candles = [];
     }
     await sleep(gap);
-
-    const candles = normalizeCandles(history);
     const atr = calculateATR(candles, 14);
     const targets = deriveTargets(row.q.lastPrice, atr, env);
     const sc = round2(row.preScore + (atr ? 0.15 : 0));

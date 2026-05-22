@@ -6,15 +6,99 @@ import {
 import { analyzeStock } from "../services/analysis.js";
 import { generateInsight } from "../services/claude.js";
 import { generateInsightOpenAI } from "../services/openai-insight.js";
-import { schwabGet } from "../services/schwab.js";
 import { getSchwabTokenForSession } from "./schwab.js";
 import { generateTradeAiViewSymbol } from "../services/trade-ai-view.js";
+import { parseBatchQuotes } from "../services/trade-rules.js";
+import { fetchStructuredLevelsForSymbols } from "../services/stock-structured-levels.js";
 import {
-  normalizePriceHistoryCandles,
-  schwabPriceHistoryParams,
-} from "../services/schwab-price-history.js";
+  fetchSchwabPriceHistoryCached,
+  fetchSchwabQuotesCached,
+} from "../services/schwab-market-cache.js";
 
 export const stocksRouter = Router();
+
+/**
+ * Batch NBBO-style fields for charts / SA picks: `GET /quotes?symbols=AAPL,MSFT&sessionId=…`
+ * (registered before `/:symbol/...` routes.)
+ */
+stocksRouter.get("/quotes", async (req, res) => {
+  try {
+    const raw = (req.query.symbols || "").toString();
+    const symbols = [
+      ...new Set(
+        raw
+          .split(/[\s,]+/)
+          .map((s) => s.trim().toUpperCase())
+          .filter((s) => /^[A-Z][A-Z0-9.]{0,5}$/.test(s))
+      ),
+    ].slice(0, 32);
+    if (symbols.length === 0) {
+      return res.status(400).json({
+        error: "Provide symbols as comma-separated tickers (e.g. symbols=AAPL,MSFT).",
+      });
+    }
+    const sessionId = (req.query.sessionId || "default").toString();
+    const sess = getSchwabTokenForSession(sessionId);
+    const accessToken = sess?.access_token;
+    if (!accessToken) {
+      return res.json({ needsSchwab: true, quotes: {} });
+    }
+    const { data: qres } = await fetchSchwabQuotesCached(symbols, accessToken, process.env);
+    const map = parseBatchQuotes(qres, symbols);
+    const quotes = {};
+    for (const sym of symbols) {
+      const q = map.get(sym);
+      quotes[sym] = q
+        ? {
+            last: q.lastPrice,
+            bid: q.bid,
+            ask: q.ask,
+            changePct: q.changePct,
+          }
+        : null;
+    }
+    res.json({ quotes, needsSchwab: false });
+  } catch (e) {
+    res.status(200).json({
+      needsSchwab: false,
+      quotes: {},
+      error: String(e.message || e),
+    });
+  }
+});
+
+/**
+ * Rule-based entry / stop / targets + score (same logic as structured trade view), no LLM.
+ * `GET /structured-levels?symbols=AAPL,MSFT&sessionId=…`
+ */
+stocksRouter.get("/structured-levels", async (req, res) => {
+  try {
+    const raw = (req.query.symbols || "").toString();
+    const symbols = [
+      ...new Set(
+        raw
+          .split(/[\s,]+/)
+          .map((s) => s.trim().toUpperCase())
+          .filter((s) => /^[A-Z][A-Z0-9.]{0,5}$/.test(s))
+      ),
+    ].slice(0, 8);
+    if (symbols.length === 0) {
+      return res.status(400).json({
+        error: "Provide symbols as comma-separated tickers (e.g. symbols=AAPL,MSFT).",
+      });
+    }
+    const sessionId = (req.query.sessionId || "default").toString();
+    const result = await fetchStructuredLevelsForSymbols({
+      symbols,
+      sessionId,
+      getSchwabTokenForSession,
+      env: process.env,
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
 
 /** Selected ticker: Schwab + rules + Claude + OpenAI structured trade view */
 stocksRouter.get("/trade-ai-view/:symbol", async (req, res) => {
@@ -43,7 +127,6 @@ stocksRouter.get("/:symbol/price-history", async (req, res) => {
     const symbol = req.params.symbol.toUpperCase();
     const sessionId = (req.query.sessionId || "default").toString();
     const rangeRaw = (req.query.range || "1M").toString();
-    const params = schwabPriceHistoryParams(rangeRaw);
     const range = String(rangeRaw).toUpperCase();
 
     const sess = getSchwabTokenForSession(sessionId);
@@ -57,22 +140,12 @@ stocksRouter.get("/:symbol/price-history", async (req, res) => {
       });
     }
 
-    const qs = new URLSearchParams({
+    const { candles } = await fetchSchwabPriceHistoryCached(
       symbol,
-      periodType: params.periodType,
-      period: String(params.period),
-      frequencyType: params.frequencyType,
-      frequency: String(params.frequency),
-    });
-    if (params.needExtendedHours) {
-      qs.set("needExtendedHoursData", "true");
-    }
-
-    const history = await schwabGet(
-      `/marketdata/v1/pricehistory?${qs.toString()}`,
-      accessToken
+      range,
+      accessToken,
+      process.env
     );
-    const candles = normalizePriceHistoryCandles(history);
     res.json({
       symbol,
       range,
@@ -109,14 +182,19 @@ stocksRouter.get("/:symbol/analysis", async (req, res) => {
     let fundamentals;
     if (accessToken) {
       try {
-        quote = await schwabGet(
-          `/marketdata/v1/quotes?symbols=${encodeURIComponent(symbol)}`,
-          accessToken
+        const { data: qres } = await fetchSchwabQuotesCached(
+          [symbol],
+          accessToken,
+          process.env
         );
-        history = await schwabGet(
-          `/marketdata/v1/pricehistory?symbol=${encodeURIComponent(symbol)}&periodType=month&period=1&frequencyType=daily&frequency=1`,
-          accessToken
+        quote = qres;
+        const { candles } = await fetchSchwabPriceHistoryCached(
+          symbol,
+          "1M",
+          accessToken,
+          process.env
         );
+        history = { candles };
       } catch {
         /* fall through to mock inside analyzeStock */
       }

@@ -3,7 +3,10 @@
  * (bias, echoed levels, thesis, risks). Per-symbol and bulk (discovery top N).
  */
 import crypto from "crypto";
-import { schwabGet } from "./schwab.js";
+import {
+  fetchSchwabPriceHistoryCached,
+  fetchSchwabQuotesCached,
+} from "./schwab-market-cache.js";
 import { calculateATR } from "../lib/indicators.js";
 import { fetchDiscoverPayload } from "./discover-payload.js";
 import { parseJsonFromModel } from "./briefing-shared.js";
@@ -190,10 +193,8 @@ export async function generateTradeAiViewSymbol(params) {
   const articles = payload._rawArticles || [];
   let qres;
   try {
-    qres = await schwabGet(
-      `/marketdata/v1/quotes?symbols=${encodeURIComponent(symbol)}`,
-      accessToken
-    );
+    const { data } = await fetchSchwabQuotesCached([symbol], accessToken, env);
+    qres = data;
   } catch (e) {
     return {
       ok: false,
@@ -214,17 +215,18 @@ export async function generateTradeAiViewSymbol(params) {
     };
   }
 
-  let history;
+  let candles = [];
   try {
-    history = await schwabGet(
-      `/marketdata/v1/pricehistory?symbol=${encodeURIComponent(symbol)}&periodType=month&period=3&frequencyType=daily&frequency=1`,
-      accessToken
+    const { candles: cached } = await fetchSchwabPriceHistoryCached(
+      symbol,
+      "3M",
+      accessToken,
+      env
     );
+    candles = normalizeCandles({ candles: cached });
   } catch {
-    history = null;
+    candles = [];
   }
-
-  const candles = normalizeCandles(history);
   const atr = calculateATR(candles, 14);
   const ruleTargets = deriveTargets(q.lastPrice, atr, env);
   const headlines = headlinesForSymbol(articles, symbol);
@@ -296,7 +298,8 @@ export async function generateTradeAiViewSymbol(params) {
     }
   };
 
-  await Promise.all([runClaude(), runOpenai()]);
+  const skipOpenai = params.skipOpenai === true || env.SEEKING_ALPHA_TRADEVIEW_SKIP_OPENAI === "1";
+  await Promise.all([runClaude(), skipOpenai ? Promise.resolve() : runOpenai()]);
 
   return {
     ok: true,
@@ -311,8 +314,10 @@ export async function generateTradeAiViewSymbol(params) {
     openai,
     claudeError: claudeError || (!apiKey?.trim() ? "Set ANTHROPIC_API_KEY for Claude trade view." : null),
     openaiError:
-      openaiError ||
-      (!oaKey?.trim() ? "Set OPENAI_API_KEY for ChatGPT trade view." : null),
+      skipOpenai
+        ? null
+        : openaiError ||
+          (!oaKey?.trim() ? "Set OPENAI_API_KEY for ChatGPT trade view." : null),
     generatedAt: new Date().toISOString(),
   };
 }
@@ -391,10 +396,7 @@ export async function generateTradeAiViewBulk(params) {
   const symParam = universe.map(encodeURIComponent).join("%2C");
   let quoteMap;
   try {
-    const qres = await schwabGet(
-      `/marketdata/v1/quotes?symbols=${symParam}`,
-      accessToken
-    );
+    const { data: qres } = await fetchSchwabQuotesCached(universe, accessToken, env);
     quoteMap = parseBatchQuotes(qres, universe);
   } catch (e) {
     return {
@@ -432,18 +434,19 @@ export async function generateTradeAiViewBulk(params) {
   const forHistory = preliminary.slice(0, historyCap);
   const enriched = [];
   for (const row of forHistory) {
-    let history;
+    let candles = [];
     try {
-      history = await schwabGet(
-        `/marketdata/v1/pricehistory?symbol=${encodeURIComponent(row.symbol)}&periodType=month&period=3&frequencyType=daily&frequency=1`,
-        accessToken
+      const { candles: cached } = await fetchSchwabPriceHistoryCached(
+        row.symbol,
+        "3M",
+        accessToken,
+        env
       );
+      candles = normalizeCandles({ candles: cached });
     } catch {
-      history = null;
+      candles = [];
     }
     await sleep(gap);
-
-    const candles = normalizeCandles(history);
     const atr = calculateATR(candles, 14);
     const ruleTargets = deriveTargets(row.q.lastPrice, atr, env);
     const sc = round2(row.preScore + (atr ? 0.15 : 0));

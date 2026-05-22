@@ -32,6 +32,11 @@ export function getDiscoverPayloadCacheTtl(env = process.env) {
   return Math.max(30_000, Number(env.DISCOVER_PAYLOAD_CACHE_MS) || 300_000);
 }
 
+/** Clears news/discover caches only — not Schwab market-data cache. */
 export function clearAllCaches() {
-  caches.clear();
+  for (const k of [...caches.keys()]) {
+    if (k.startsWith("feed:") || k.startsWith("discover_payload:")) {
+      caches.delete(k);
+    }
+  }
 }

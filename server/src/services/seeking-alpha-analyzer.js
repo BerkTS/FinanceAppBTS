@@ -13,15 +13,21 @@ import {
   setSeekingAlphaRunState,
   saveSeekingAlphaPicks,
 } from "./seeking-alpha-picks-store.js";
+import { getSchwabTokenForSession } from "../routes/schwab.js";
+import { generateTradeAiViewSymbol } from "./trade-ai-view.js";
 
 let runLock = false;
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export function isSeekingAlphaAnalysisRunning() {
   return runLock || getSeekingAlphaRunState().running;
 }
 
 /**
- * @param {{ trigger?: 'manual'|'scheduled' }} [options]
+ * @param {{ trigger?: 'manual'|'scheduled', sessionId?: string }} [options]
  */
 export async function runSeekingAlphaAnalysis(options = {}, env = process.env) {
   if (env.SEEKING_ALPHA_BROWSER_DISABLED === "1") {
@@ -32,6 +38,8 @@ export async function runSeekingAlphaAnalysis(options = {}, env = process.env) {
   }
 
   const trigger = options.trigger || "manual";
+  const schwabSessionId =
+    (options.sessionId || env.SCHWAB_SESSION_ID || "default").toString() || "default";
   runLock = true;
   setSeekingAlphaRunState({
     running: true,
@@ -86,6 +94,47 @@ export async function runSeekingAlphaAnalysis(options = {}, env = process.env) {
     );
     const normalized = normalizePicks(picksRaw);
 
+    const picksWithSchwab = Array.isArray(normalized.picks) ? [...normalized.picks] : [];
+    for (let i = 0; i < picksWithSchwab.length; i++) {
+      const pick = picksWithSchwab[i];
+      const symbol = String(pick.symbol || "").toUpperCase();
+      if (!symbol) continue;
+      if (i > 0) await sleep(Math.max(120, Number(env.TRADE_SUGGEST_HISTORY_GAP_MS) || 220));
+      try {
+        const tv = await generateTradeAiViewSymbol({
+          symbol,
+          sessionId: schwabSessionId,
+          limit: 60,
+          newsApiFinanceQuery: env.NEWSAPI_FINANCE_QUERY,
+          newsApiGeoQuery: env.NEWSAPI_GEO_QUERY,
+          getSchwabTokenForSession,
+          env,
+          skipOpenai: true,
+        });
+        pick.schwabTradeView = {
+          ok: tv.ok,
+          needsSchwab: tv.needsSchwab,
+          error: tv.error || null,
+          ruleTargets: tv.ruleTargets || null,
+          score: tv.score ?? null,
+          quote: tv.quote || null,
+          claude: tv.claude || null,
+          claudeError: tv.claudeError || null,
+          disclaimer: tv.disclaimer,
+          generatedAt: tv.generatedAt,
+        };
+      } catch (e) {
+        pick.schwabTradeView = {
+          ok: false,
+          error: String(e.message || e),
+          ruleTargets: null,
+          score: null,
+          quote: null,
+          claude: null,
+        };
+      }
+    }
+
     const result = {
       ok: true,
       loginRequired: false,
@@ -95,6 +144,7 @@ export async function runSeekingAlphaAnalysis(options = {}, env = process.env) {
       planNotes: plan.notes || "",
       symbolsSpotted: plan.symbolsSpotted || [],
       ...normalized,
+      picks: picksWithSchwab,
     };
     saveSeekingAlphaPicks(result);
     setSeekingAlphaRunState({
@@ -122,12 +172,15 @@ export async function runSeekingAlphaAnalysis(options = {}, env = process.env) {
 
 /**
  * Fire-and-forget background run (scheduler / API).
+ * @param {'manual'|'scheduled'} [trigger]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {string} [sessionId] Schwab session (default "default"); pass client session for quotes/levels.
  */
-export function enqueueSeekingAlphaAnalysis(trigger = "manual", env = process.env) {
+export function enqueueSeekingAlphaAnalysis(trigger = "manual", env = process.env, sessionId) {
   if (isSeekingAlphaAnalysisRunning()) {
     return { started: false, reason: "already_running" };
   }
-  runSeekingAlphaAnalysis({ trigger }, env).catch((e) => {
+  runSeekingAlphaAnalysis({ trigger, sessionId }, env).catch((e) => {
     console.error("[seeking-alpha] Analysis failed:", e.message);
   });
   return { started: true };

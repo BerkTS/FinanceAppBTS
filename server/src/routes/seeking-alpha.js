@@ -51,13 +51,15 @@ seekingAlphaRouter.post("/analyze", async (req, res) => {
       return res.status(409).json({ ok: false, error: "Analysis already running." });
     }
 
+    const sessionId = (req.body?.sessionId || req.query.sessionId || "default").toString();
+
     const sync = req.query.sync === "1" || req.body?.sync === true;
     if (sync) {
-      const result = await runSeekingAlphaAnalysis({ trigger: "manual" }, process.env);
+      const result = await runSeekingAlphaAnalysis({ trigger: "manual", sessionId }, process.env);
       return res.json({ ok: true, started: false, result });
     }
 
-    const enq = enqueueSeekingAlphaAnalysis("manual", process.env);
+    const enq = enqueueSeekingAlphaAnalysis("manual", process.env, sessionId);
     res.json({
       ok: true,
       started: enq.started,

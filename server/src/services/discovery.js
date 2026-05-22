@@ -1,5 +1,6 @@
 import { extractTickersFromArticles } from "./news.js";
-import { mockMovers, schwabGet } from "./schwab.js";
+import { mockMovers } from "./schwab.js";
+import { fetchSchwabMoversCached } from "./schwab-market-cache.js";
 
 function normalizeMoverList(list) {
   if (!Array.isArray(list)) return [];
@@ -44,7 +45,8 @@ export async function discoverTopStocks({ articles, accessToken }) {
   let movers;
   if (accessToken) {
     try {
-      movers = await schwabGet("/marketdata/v1/movers/$SPX", accessToken);
+      const { data } = await fetchSchwabMoversCached(accessToken);
+      movers = data;
     } catch {
       movers = mockMovers();
     }
